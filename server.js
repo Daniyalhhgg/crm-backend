@@ -255,7 +255,9 @@ app.set('io', io);
 // ======================
 app.use(helmet());
 
-// ✅ FIXED CORS (PRODUCTION READY)
+// ======================
+// CORS CONFIG (PRODUCTION READY)
+// ======================
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
@@ -265,10 +267,9 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     } else {
       return callback(new Error('CORS not allowed'));
@@ -278,14 +279,17 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
-// ✅ Handle preflight requests (IMPORTANT FIX)
-app.options('*', cors());
+// ✅ FIX: proper preflight handling (NO '*' ERROR)
+app.options(/.*/, cors());
 
+// ======================
+// BODY PARSER
+// ======================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ======================
-// REQUEST LOGGER
+// LOGGER
 // ======================
 app.use((req, res, next) => {
   console.log(`📡 ${req.method} ${req.originalUrl}`);
@@ -296,16 +300,14 @@ app.use((req, res, next) => {
 // DATABASE
 // ======================
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('✅ MongoDB Connected');
-  })
+  .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => {
     console.error('❌ Mongo Error:', err.message);
     process.exit(1);
   });
 
 // ======================
-// ROOT
+// ROOT ROUTE
 // ======================
 app.get('/', (req, res) => {
   res.json({
@@ -323,7 +325,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // ======================
-// ROUTES
+// MAIN ROUTES
 // ======================
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/chats', require('./routes/chatRoutes'));
@@ -333,7 +335,7 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/webhook', require('./routes/webhookRoutes'));
 
 // ======================
-// HUMAN MODE ROUTES (SAFE LOAD)
+// HUMAN MODE ROUTES
 // ======================
 try {
   const humanModeRoutes = require('./routes/humanModeRoutes');
