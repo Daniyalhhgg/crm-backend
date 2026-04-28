@@ -255,15 +255,38 @@ app.set('io', io);
 // ======================
 app.use(helmet());
 
+// ✅ FIXED CORS (PRODUCTION READY)
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://crm-frontend-fzlmf8woj-daniyal1.vercel.app'
+];
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('CORS not allowed'));
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
+
+// ✅ Handle preflight requests (IMPORTANT FIX)
+app.options('*', cors());
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 🔥 GLOBAL REQUEST LOGGER (VERY IMPORTANT)
+// ======================
+// REQUEST LOGGER
+// ======================
 app.use((req, res, next) => {
   console.log(`📡 ${req.method} ${req.originalUrl}`);
   next();
@@ -287,12 +310,12 @@ mongoose.connect(process.env.MONGODB_URI)
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'API RUNNING',
+    message: 'API RUNNING'
   });
 });
 
 // ======================
-// TEST ROUTE (CRITICAL)
+// TEST ROUTE
 // ======================
 app.get('/api/test', (req, res) => {
   console.log("🔥 TEST ROUTE HIT");
@@ -300,7 +323,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // ======================
-// NORMAL ROUTES
+// ROUTES
 // ======================
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/chats', require('./routes/chatRoutes'));
@@ -310,16 +333,11 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/webhook', require('./routes/webhookRoutes'));
 
 // ======================
-// HUMAN MODE ROUTES (DEBUG MODE)
+// HUMAN MODE ROUTES (SAFE LOAD)
 // ======================
-let humanModeRoutes;
-
 try {
-  humanModeRoutes = require('./routes/humanModeRoutes');
+  const humanModeRoutes = require('./routes/humanModeRoutes');
 
-  console.log("✅ humanModeRoutes LOADED");
-
-  // 🔥 MIDDLEWARE HIT CHECK
   app.use('/api/human-mode', (req, res, next) => {
     console.log("🔥 HUMAN MODE ROUTE HIT");
     next();
@@ -330,14 +348,14 @@ try {
   console.log("🚀 HUMAN MODE ROUTES REGISTERED");
 
 } catch (err) {
-  console.error("❌ ERROR LOADING humanModeRoutes:", err.message);
+  console.error("❌ humanModeRoutes error:", err.message);
 }
 
 // ======================
-// 🔥 DIRECT FALLBACK ROUTE (BYPASS ROUTER)
+// FALLBACK ROUTE
 // ======================
 app.get('/api/human-mode/check/:phone', (req, res) => {
-  console.log("⚡ DIRECT ROUTE HIT");
+  console.log("⚡ FALLBACK ROUTE HIT");
   res.json({
     success: true,
     fallback: true,
@@ -346,14 +364,14 @@ app.get('/api/human-mode/check/:phone', (req, res) => {
 });
 
 // ======================
-// HEALTH
+// HEALTH CHECK
 // ======================
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
 });
 
 // ======================
-// 404
+// 404 HANDLER
 // ======================
 app.use((req, res) => {
   res.status(404).json({
@@ -368,8 +386,7 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
-
 
 //MONGODB_URI=mongodb+srv://DANIYAL:Daniyal1234@cluster0.ospq1ut.mongodb.net/restaurant-crm?retryWrites=true&w=majority&appName=Cluster0
