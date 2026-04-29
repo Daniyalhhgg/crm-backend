@@ -1,12 +1,12 @@
-// controllers/humanModeController.js
+// controllers/Humanmodecontroller.js
 const axios = require("axios");
 const Chat = require("../models/Chat");
 
 const store = {};   // temporary in-memory store
 
-// n8n ke liye - NO auth
+// Check Human Mode (n8n/bot ke liye)
 exports.checkHumanMode = (req, res) => {
-  const phone = req.params.phone.replace(/[^0-9]/g, ""); // clean phone
+  const phone = req.params.phone.replace(/[^0-9]/g, "");
   const humanMode = store[phone]?.on || false;
 
   console.log(`[Check Human Mode] ${phone} → ${humanMode}`);
@@ -18,7 +18,7 @@ exports.checkHumanMode = (req, res) => {
   });
 };
 
-// dashboard se toggle
+// Toggle Human Mode from Dashboard
 exports.toggleHumanMode = (req, res) => {
   const phone = req.params.phone.replace(/[^0-9]/g, "");
   const { humanMode } = req.body;
@@ -28,12 +28,14 @@ exports.toggleHumanMode = (req, res) => {
   console.log(`[Toggle Human Mode] ${phone} → ${humanMode ? "ON" : "OFF"}`);
 
   const io = req.app.get("io");
-  if (io) io.to("chat-admins").emit("human-mode-changed", { phone, humanMode: !!humanMode });
+  if (io) {
+    io.to("chat-admins").emit("human-mode-changed", { phone, humanMode: !!humanMode });
+  }
 
   res.json({ success: true, phone, humanMode: !!humanMode });
 };
 
-// agent reply
+// Agent Reply
 exports.sendAgentReply = async (req, res) => {
   try {
     const { toPhone, message } = req.body;
@@ -43,7 +45,7 @@ exports.sendAgentReply = async (req, res) => {
 
     const phone = toPhone.replace(/[^0-9]/g, "");
 
-    // WhatsApp Cloud API call
+    // WhatsApp Cloud API
     await axios.post(
       `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
@@ -60,8 +62,8 @@ exports.sendAgentReply = async (req, res) => {
       }
     );
 
-    // Save in DB as admin message
-    const savedChat = await Chat.create({
+    // Save in DB
+    await Chat.create({
       restaurantId: req.admin?.restaurantId || "restaurant-1",
       customerPhone: phone,
       botReply: message,
@@ -84,7 +86,7 @@ exports.sendAgentReply = async (req, res) => {
 
     res.json({ success: true, message: "Reply sent successfully" });
   } catch (error) {
-    console.error("Agent Reply Error:", error.message);
+    console.error("Agent Reply Error:", error.response?.data || error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
