@@ -1,12 +1,14 @@
-// routes/humanModeRoutes.js
+// routes/Humanmoderoutes.js
 const express = require("express");
 const router = express.Router();
 
 const auth = require("../middleware/auth");
-const { 
-  checkHumanMode, 
-  toggleHumanMode, 
-  sendAgentReply 
+
+// ✅ Correct require (file name ke hisaab se)
+const {
+  checkHumanMode,
+  toggleHumanMode,
+  sendAgentReply
 } = require("../controllers/Humanmodecontroller");
 
 console.log("✅ [humanModeRoutes] File loaded");
