@@ -232,167 +232,6 @@
 // //   console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
 // //   process.exit(1);
 // // });
-// require('dotenv').config();
-
-// const express = require('express');
-// const mongoose = require('mongoose');
-// const cors = require('cors');
-// const helmet = require('helmet');
-// const http = require('http');
-
-// const app = express();
-// const server = http.createServer(app);
-
-// // ======================
-// // SOCKET.IO SETUP
-// // ======================
-// const { initSocket } = require('./realtime/socket');
-// const io = initSocket(server);
-// app.set('io', io);
-
-// // ======================
-// // MIDDLEWARE
-// // ======================
-// app.use(helmet());
-
-// // ======================
-// // CORS CONFIG (PRODUCTION READY)
-// // ======================
-// const allowedOrigins = [
-//   'http://localhost:3000',
-//   'http://localhost:5173',
-//   'http://localhost:5174',
-//   'https://crm-frontend-fzlmf8woj-daniyal1.vercel.app'
-//    'https://crm-frontend-omega-six.vercel.app'
-// ];
-
-// app.use(cors({
-//   origin: function (origin, callback) {
-//     if (!origin) return callback(null, true);
-
-//     if (allowedOrigins.includes(origin)) {
-//       return callback(null, true);
-//     } else {
-//       return callback(new Error('CORS not allowed'));
-//     }
-//   },
-//   credentials: true,
-//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-// }));
-
-// // ✅ FIX: proper preflight handling (NO '*' ERROR)
-// app.options(/.*/, cors());
-
-// // ======================
-// // BODY PARSER
-// // ======================
-// app.use(express.json({ limit: '10mb' }));
-// app.use(express.urlencoded({ extended: true }));
-
-// // ======================
-// // LOGGER
-// // ======================
-// app.use((req, res, next) => {
-//   console.log(`📡 ${req.method} ${req.originalUrl}`);
-//   next();
-// });
-
-// // ======================
-// // DATABASE
-// // ======================
-// mongoose.connect(process.env.MONGODB_URI)
-//   .then(() => console.log('✅ MongoDB Connected'))
-//   .catch(err => {
-//     console.error('❌ Mongo Error:', err.message);
-//     process.exit(1);
-//   });
-
-// // ======================
-// // ROOT ROUTE
-// // ======================
-// app.get('/', (req, res) => {
-//   res.json({
-//     success: true,
-//     message: 'API RUNNING'
-//   });
-// });
-
-// // ======================
-// // TEST ROUTE
-// // ======================
-// app.get('/api/test', (req, res) => {
-//   console.log("🔥 TEST ROUTE HIT");
-//   res.json({ success: true });
-// });
-
-// // ======================
-// // MAIN ROUTES
-// // ======================
-// app.use('/api/auth', require('./routes/authRoutes'));
-// app.use('/api/chats', require('./routes/chatRoutes'));
-// app.use('/api/bookings', require('./routes/bookingRoutes'));
-// app.use('/api/customers', require('./routes/customerRoutes'));
-// app.use('/api/dashboard', require('./routes/dashboardRoutes'));
-// app.use('/api/webhook', require('./routes/webhookRoutes'));
-
-// // ======================
-// // HUMAN MODE ROUTES
-// // ======================
-// try {
-//   const humanModeRoutes = require('./routes/humanModeRoutes');
-
-//   app.use('/api/human-mode', (req, res, next) => {
-//     console.log("🔥 HUMAN MODE ROUTE HIT");
-//     next();
-//   });
-
-//   app.use('/api/human-mode', humanModeRoutes);
-
-//   console.log("🚀 HUMAN MODE ROUTES REGISTERED");
-
-// } catch (err) {
-//   console.error("❌ humanModeRoutes error:", err.message);
-// }
-
-// // ======================
-// // FALLBACK ROUTE
-// // ======================
-// app.get('/api/human-mode/check/:phone', (req, res) => {
-//   console.log("⚡ FALLBACK ROUTE HIT");
-//   res.json({
-//     success: true,
-//     fallback: true,
-//     phone: req.params.phone
-//   });
-// });
-
-// // ======================
-// // HEALTH CHECK
-// // ======================
-// app.get('/health', (req, res) => {
-//   res.json({ status: 'OK' });
-// });
-
-// // ======================
-// // 404 HANDLER
-// // ======================
-// app.use((req, res) => {
-//   res.status(404).json({
-//     success: false,
-//     message: `Route not found: ${req.originalUrl}`
-//   });
-// });
-
-// // ======================
-// // START SERVER
-// // ======================
-// const PORT = process.env.PORT || 5000;
-
-// server.listen(PORT, () => {
-//   console.log(`🚀 Server running on port ${PORT}`);
-// });
-
-// //MONGODB_URI=mongodb+srv://DANIYAL:Daniyal1234@cluster0.ospq1ut.mongodb.net/restaurant-crm?retryWrites=true&w=majority&appName=Cluster0
 require('dotenv').config();
 
 const express = require('express');
@@ -417,14 +256,14 @@ app.set('io', io);
 app.use(helmet());
 
 // ======================
-// CORS CONFIG (FIXED ✅)
+// CORS CONFIG (PRODUCTION READY)
 // ======================
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:5174',
   'https://crm-frontend-fzlmf8woj-daniyal1.vercel.app',
-  'https://crm-frontend-omega-six.vercel.app' // ✅ comma fixed
+   'https://crm-frontend-omega-six.vercel.app'
 ];
 
 app.use(cors({
@@ -434,13 +273,14 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     } else {
-      return callback(new Error('CORS not allowed: ' + origin));
+      return callback(new Error('CORS not allowed'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
+// ✅ FIX: proper preflight handling (NO '*' ERROR)
 app.options(/.*/, cors());
 
 // ======================
@@ -496,12 +336,15 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/webhook', require('./routes/webhookRoutes'));
 
 // ======================
-// HUMAN MODE ROUTES (FIXED ✅)
+// HUMAN MODE ROUTES
 // ======================
 try {
   const humanModeRoutes = require('./routes/humanModeRoutes');
 
-  console.log("🔥 humanModeRoutes loaded successfully");
+  app.use('/api/human-mode', (req, res, next) => {
+    console.log("🔥 HUMAN MODE ROUTE HIT");
+    next();
+  });
 
   app.use('/api/human-mode', humanModeRoutes);
 
@@ -511,7 +354,17 @@ try {
   console.error("❌ humanModeRoutes error:", err.message);
 }
 
-// ❌ REMOVED FALLBACK ROUTE (important)
+// ======================
+// FALLBACK ROUTE
+// ======================
+app.get('/api/human-mode/check/:phone', (req, res) => {
+  console.log("⚡ FALLBACK ROUTE HIT");
+  res.json({
+    success: true,
+    fallback: true,
+    phone: req.params.phone
+  });
+});
 
 // ======================
 // HEALTH CHECK
@@ -538,3 +391,6 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+// //MONGODB_URI=mongodb+srv://DANIYAL:Daniyal1234@cluster0.ospq1ut.mongodb.net/restaurant-crm?retryWrites=true&w=majority&appName=Cluster0
+
