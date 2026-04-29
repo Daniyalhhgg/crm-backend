@@ -4,7 +4,7 @@ const router = express.Router();
 
 const auth = require("../middleware/auth");
 
-// ✅ Correct require (file name ke hisaab se)
+// ✅ Exact file name ke hisaab se require
 const {
   checkHumanMode,
   toggleHumanMode,
