@@ -7,7 +7,7 @@ const {
   checkHumanMode, 
   toggleHumanMode, 
   sendAgentReply 
-} = require("../controllers/humanModeController");
+} = require("../controllers/Humanmodecontroller");
 
 console.log("✅ [humanModeRoutes] File loaded");
 
