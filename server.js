@@ -339,7 +339,7 @@ app.use('/api/webhook', require('./routes/webhookRoutes'));
 // HUMAN MODE ROUTES
 // ======================
 try {
-  const humanModeRoutes = require('./routes/humanModeRoutes');
+  const humanModeRoutes = require('./routes/Humanmoderoutes');
 
   app.use('/api/human-mode', (req, res, next) => {
     console.log("🔥 HUMAN MODE ROUTE HIT");
