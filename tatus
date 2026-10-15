@@ -1,0 +1,25 @@
+* [32m(no branch, rebasing master)       [m 1e0527d Update CRM backend
+  master                             [m 5590611 Update CRM backend
+  [31mremotes/origin/HEAD                [m -> origin/main
+  [31mremotes/origin/backup-before-update[m e011010 Improve MongoDB connection logic and messagesu,
+  [31mremotes/origin/main                [m 5590611 Update CRM backend
+  [31mremotes/origin/master              [m 5590611 Update CRM backend
+  [31mremotes/second/HEAD                [m -> second/main
+  [31mremotes/second/main                [m 5590611 Update CRM backend
+
+                   SSUUMMMMAARRYY OOFF LLEESSSS CCOOMMMMAANNDDSS
+
+      Commands marked with * may be preceded by a number, _N.
+      Notes in parentheses indicate the behavior if _N is given.
+      A key preceded by a caret indicates the Ctrl key; thus ^K is ctrl-K.
+
+  h  H                 Display this help.
+  q  :q  Q  :Q  ZZ     Exit.
+ ---------------------------------------------------------------------------
+
+                           MMOOVVIINNGG
+
+  e  ^E  j  ^N  CR  *  Forward  one line   (or _N lines).
+  y  ^Y  k  ^K  ^P  *  Backward one line   (or _N lines).
+  ESC-j             *  Forward  one file line (or _N file lines).
+  ESC-k             *  Backward one file line (or _N file lines).

@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.git/
+
+.env
+.env.*
+!.env.example
+
+.env
+
+.env

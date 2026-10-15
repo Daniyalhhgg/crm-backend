@@ -1,0 +1,3064 @@
+{
+  "name": "Restaurant WhatsApp AI Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a213dc45-ec81-4395-8af2-88c99f3e666a",
+              "name": "userMessage",
+              "value": "={{ $json.messages[0].text?.body ?? $json.messages[0].image?.caption ?? $json.messages[0].document?.caption ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "187fed86-6280-45dd-a331-4c34c696a179",
+              "name": "toNumber",
+              "value": "={{ $json.metadata.phone_number_id }}",
+              "type": "string"
+            },
+            {
+              "id": "28c1a28e-df00-4771-bc28-7b1b15d9545a",
+              "name": "messageType",
+              "value": "={{ $json.messages[0].type }}",
+              "type": "string"
+            },
+            {
+              "id": "2380e704-d7e8-4810-8c6f-ec2f89d52e6d",
+              "name": "fromNumber",
+              "value": "={{ $json.contacts[0].wa_id }}",
+              "type": "string"
+            },
+            {
+              "id": "4f65506d-09f8-4adb-996f-0c74168635cf",
+              "name": "resturantId",
+              "value": "resturant-1",
+              "type": "string"
+            },
+            {
+              "id": "6e123b8a-1d37-4d96-8d24-c47a4ecd59e0",
+              "name": "mediaId",
+              "value": "={{ $json.messages[0].audio?.id ?? $json.messages[0].image?.id ?? $json.messages[0].video?.id ?? $json.messages[0].document?.id ?? '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        0
+      ],
+      "id": "07d445ea-368b-4cb1-9d6f-e94b21552e1e",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cacb55cb-5dbb-43f6-96b1-1eb95fdd43e4",
+              "leftValue": "={{ $json.messageType }}",
+              "rightValue": "audio",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "cbb5a004-6f9a-43a1-a876-556613bd1689",
+      "name": "IF CONDTION (audio true , text false)"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v18.0/{{ $('Edit Fields').first().json.mediaId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1300,
+        -240
+      ],
+      "id": "57aafde1-f827-47b0-b25e-813468b30310",
+      "name": "HTTP Request read url audio",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1560,
+        -240
+      ],
+      "id": "dc07eb2c-a024-4a79-aa60-35efb9acbd1b",
+      "name": "HTTP Request download audio from url and send to gemini in binary format",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Prepare CRM menu context').first().json.userMessage }}",
+        "options": {
+          "systemMessage": "={{ $('Get live AI Agent prompt').first().json.data.prompt + \"\\n\\nSERVICE CLOSURES (dates in Pakistan time):\\n\" + $('Prepare CRM menu context').first().json.closureContext + \"\\n\\nLIVE MENU FROM CRM (current price, price notes, extras and active offers):\\n\" + $('Prepare CRM menu context').first().json.menuContext + \"\\n\\nLIVE ROOM TYPES AND NIGHTLY RATES (from CRM; choose exact roomTypeId):\\n\" + $('Prepare CRM menu context').first().json.roomTypesContext + \"\\n\\nCS-APPROVED INQUIRY LEARNING: Use an answer only when relevant and adapt it to the customer's language. Current CRM menu prices, room rates, availability, and closures always override this learning.\\n\" + JSON.stringify($('Get active inquiry learning').first().json.data || []) }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        4420,
+        140
+      ],
+      "id": "c93ed58c-2635-4efe-9868-340566725eb9",
+      "name": "AI Agent",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1820,
+        -240
+      ],
+      "id": "de0aff64-62b4-4b22-a30c-53818d7c82d6",
+      "name": "Transcribe a recording",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "vmvL9W0VZjQf1fuw",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ecbbaef5-f3f4-4fff-a449-2d29c0c08348",
+              "name": "userMessage",
+              "value": "={{ $json.content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "4234b4ee-3cdf-4d25-a8de-5cd34550e0ee",
+              "name": "fromNumber",
+              "value": "={{ $('Edit Fields').first().json.fromNumber }}",
+              "type": "string"
+            },
+            {
+              "id": "43d1ae84-75cc-40fc-8a75-60844fcaf47c",
+              "name": "restaurantId",
+              "value": "restaurant-1",
+              "type": "string"
+            },
+            {
+              "id": "29134922-1c7d-49c4-bbeb-59a3688c7150",
+              "name": "toNumber",
+              "value": "={{ $('Edit Fields').first().json.toNumber }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2080,
+        -240
+      ],
+      "id": "604acfcc-a506-4f45-9f6f-a53e70613a8c",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f5288d16-bca7-46b8-821a-51d6ea29d548",
+              "name": "userMessage",
+              "value": "={{ $json.userMessage }}",
+              "type": "string"
+            },
+            {
+              "id": "082b7521-8eb3-41d4-ba13-7f60e0c47a5f",
+              "name": "fromNumber",
+              "value": "={{ $json.fromNumber }}",
+              "type": "string"
+            },
+            {
+              "id": "3111273e-1569-4907-b7ed-ef87ac826206",
+              "name": "toNumber",
+              "value": "={{ $json.toNumber }}",
+              "type": "string"
+            },
+            {
+              "id": "57d8f443-fec9-460e-ae37-32dc830a4edc",
+              "name": "restaurantId",
+              "value": "restaurant-1",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2340,
+        0
+      ],
+      "id": "dbc58cd0-aa04-45df-8663-9667a2392075",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2080,
+        0
+      ],
+      "id": "98220cfa-8536-4bac-8d05-b1de66dc2241",
+      "name": "Merge",
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a9b9e0d1-c0b2-4f60-9801-111f339733a4",
+              "name": "userMessage",
+              "value": "={{ $('Edit Fields').first().json.userMessage }}",
+              "type": "string"
+            },
+            {
+              "id": "1c8d9044-f569-479a-99ac-75aef8600352",
+              "name": "fromNumber",
+              "value": "={{ $('Edit Fields').first().json.fromNumber }}",
+              "type": "string"
+            },
+            {
+              "id": "d6664a1e-1c27-4b56-a2b3-3ea681cf99a4",
+              "name": "toNumber",
+              "value": "={{ $('Edit Fields').first().json.toNumber }}",
+              "type": "string"
+            },
+            {
+              "id": "1b2e8297-8c7a-4051-92bb-cbccc6b97f9e",
+              "name": "restaurantId",
+              "value": "restaurant-1",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1300,
+        80
+      ],
+      "id": "355e4fb8-3cf9-4c03-8a9f-01604787c5d1",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "29f339cd-2873-4411-9eea-5b137eb70b3e",
+      "name": "WhatsApp Trigger",
+      "webhookId": "1c2942a1-b175-4b43-8249-765fa3729bad",
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "cxVZGWXpou4PRZgW",
+          "name": "WhatsApp OAuth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "+923278140188",
+        "textBody": "=New customer needs help!\\nFrom: {{ $('Edit Fields').first().json.fromNumber }}\\nMessage: {{ $('Edit Fields').first().json.userMessage }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        7460,
+        -600
+      ],
+      "id": "a7a8c204-d229-40ac-bcae-edbf71e785ac",
+      "name": "Send message2",
+      "webhookId": "3a56df48-865c-4a3b-b193-011f00afb2d8",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ \n  (($json.output || $json.text || $json.message || \"\").toLowerCase().includes(\"human\") ||\n   ($json.output || $json.text || $json.message || \"\").toLowerCase().includes(\"agent\") ||\n   ($json.output || $json.text || $json.message || \"\").toLowerCase().includes(\"insaan\") ||\n   ($json.output || $json.text || $json.message || \"\").toLowerCase().includes(\"operator\") ||\n   ($json.output || $json.text || $json.message || \"\").toLowerCase().includes(\"banda\") ||\n   ($json.output || $json.text || $json.message || \"\").toLowerCase().includes(\"live agent\"))\n}}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "id": "c19654b8-7e95-4ee4-9427-4bc989482e54"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "5e859731-5402-4d45-a7d0-f637b106d170",
+                    "leftValue": "={{ ($json.output || \"\").includes('\"action\": \"create_booking\"') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b4a4c2a5-cb31-4b4f-8057-5dbfc76c5856",
+                    "leftValue": "={{ \n  ($json.output && $json.output.includes(\"***SEND_HITEA_IMAGES***\")) ||\n  (\n    ($json.userMessage && $json.userMessage.toLowerCase().includes(\"hi-tea\") || \n     $json.userMessage && $json.userMessage.toLowerCase().includes(\"hitea\") ||\n     $json.userMessage && $json.userMessage.toLowerCase().includes(\"hi tea\")) &&\n    ($json.userMessage && $json.userMessage.toLowerCase().includes(\"menu\") ||\n     $json.userMessage && $json.userMessage.toLowerCase().includes(\"picture\") ||\n     $json.userMessage && $json.userMessage.toLowerCase().includes(\"image\") ||\n     $json.userMessage && $json.userMessage.toLowerCase().includes(\"dikhao\") ||\n     $json.userMessage && $json.userMessage.toLowerCase().includes(\"show\"))\n  )\n}}",
+                    "rightValue": "true",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "ba80a039-5993-4e01-93a0-997350ef9abe",
+                    "leftValue": "={{ $json.output && $json.output.includes(\"***SEND_DINNER_IMAGES***\") }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0083c06c-2c9b-432a-a8cd-3a27be4d07a0",
+                    "leftValue": "={{ $json.output && $json.output.includes(\"***SEND_WEDDING_IMAGES***\") }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1e6282cd-a1e8-4b29-a7c2-990e32fb538e",
+                    "leftValue": "={{ $json.output && $json.output.includes(\"***SEND_POOL_IMAGES***\") }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "54cd6222-e964-459c-9fc1-27b42b17bdd0",
+                    "leftValue": "={{ /\"action\"\\s*:\\s*\"create_reminder\"/.test($json.output || \"\") }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        4680,
+        140
+      ],
+      "id": "a4aca99f-fbdd-45c6-bcad-46a85d979894",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/bookings/from-whatsapp",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { fromNumber: $('Edit Fields3').first().json.fromNumber, bookingData: { restaurantId: 'restaurant-1', customerName: $('Booking Code').first().json.customer.name, customerEmail: $('Booking Code').first().json.customer.email || '', customerPhone: $('Booking Code').first().json.customer.phone, package: $('Booking Code').first().json.order.package, bookingCategory: $('Booking Code').first().json.order.category || '', selectedItems: $('Booking Code').first().json.order.selectedItems || [], bookingDetails: $('Booking Code').first().json.order.bookingDetails || [], numberOfPersons: Number($('Booking Code').first().json.order.persons), bookingDate: $('Booking Code').first().json.order.date, bookingTime: $('Booking Code').first().json.order.time || '15:00', roomTypeId: $('Booking Code').first().json.order.roomTypeId || undefined, roomType: $('Booking Code').first().json.order.roomType || '', checkOutDate: $('Booking Code').first().json.order.checkOutDate || undefined, numberOfRooms: Number($('Booking Code').first().json.order.numberOfRooms || 1), specialRequests: $('Booking Code').first().json.order.special_request || '', totalAmount: Number($('Booking Code').first().json.order.totalAmount), source: 'whatsapp_bot' } } }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5980,
+        -420
+      ],
+      "id": "5c3b1b23-acf4-4f3c-83cb-be5644d6a542",
+      "name": "HTTP Request2",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        4420,
+        400
+      ],
+      "id": "a4712566-902b-4ad0-b0b5-b4dae5c52616",
+      "name": "Mistral Cloud Chat Model",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "7dKTCMjgFZaVnGnQ",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('WhatsApp Trigger').first().json.contacts?.[0]?.wa_id ?? $('WhatsApp Trigger').first().json.from }}",
+        "collectionName": "=n8n_chat_histories",
+        "databaseName": "hotel_bot"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryMongoDbChat",
+      "typeVersion": 1,
+      "position": [
+        4420,
+        560
+      ],
+      "id": "24e4f707-c47c-4596-997c-1021cabc5f30",
+      "name": "MongoDB Chat Memory",
+      "credentials": {
+        "mongoDb": {
+          "id": "HaxRPUsKYZPpnTl1",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/chats/whatsapp",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"customerId\": \"{{ $('Edit Fields3').first().json.fromNumber }}\",\n  \"customerMessage\": {{ JSON.stringify($('Edit Fields3').first().json.userMessage) }},\n  \"botReply\": {{ JSON.stringify($('AI Agent').first().json.output) }},\n  \"fromNumber\": \"{{ $('Edit Fields3').first().json.fromNumber }}\",\n  \"phone\": \"{{ $('Edit Fields3').first().json.fromNumber }}\",\n  \"direction\": \"bot\",\n  \"source\": \"whatsapp\",\n  \"restaurantId\": \"restaurant-1\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5200,
+        1450
+      ],
+      "id": "d1efa34e-815f-40a7-bf82-6f9b9ffd56e2",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8066a3e2-a4a4-48da-b2f3-36017d4a0b76",
+              "leftValue": "={{ $json.userMessage }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ee2d102f-d694-42da-9121-594a2d55494a",
+              "leftValue": "={{ $json.messageType }}",
+              "rightValue": "audio",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        780,
+        0
+      ],
+      "id": "8385362c-7bec-4d1d-b287-8940af3d86f6",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Edit Fields3').first().json.fromNumber }}",
+        "textBody": "=🏨 *Hotel d'Gates* — Lavish All Day Buffet!\nMutton Item included | 60+ Dishes\n🎉 *Buy 5 Get 1 FREE* — Daily Offer!\n\n🍽️ *Delicious Specialities:*\n\n- Pakistani food variety with Mutton item\n- Chinese food variety\n- BBQ\n- Pan Asian food variety\n- Spice lovers variety (Chaat Bar) 🌶️\n- Sweets lovers variety (Dessert Bar) 🍮\n- Kids special (Pizza, Burger, Fries, Patties, Chocolate Fountain) 🍕\n- Variety of fried items\n- Variety of Naan\n- Juices / Lemonade included 🥤\n- Tea / Green Tea included ☕\n- 60+ items\n\n💰 *@2200 + Tax*\n⚡ Limited slots left — Book your table now!\n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        6500,
+        1380
+      ],
+      "id": "f3efa847-1fe8-4bb4-a4a2-d9efb4277cc2",
+      "name": "Send message4",
+      "webhookId": "d2f5e60f-b957-4865-aae9-cdf06329bfee",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let output = $input.first().json.output || '';\noutput = output.replace(/\\*\\*\\*SEND_HITEA_IMAGES\\*\\*\\*/g, '').trim();\nreturn [{ json: { output, category: 'Hi-Tea Buffet', fromNumber: $('Edit Fields3').first().json.fromNumber } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5200,
+        -20
+      ],
+      "id": "5825916e-d950-4fb4-8628-220fb69f80e0",
+      "name": "Clean Hi-Tea Tag"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Clean Hi-Tea Tag').first().json.fromNumber }}",
+        "messageType": "video",
+        "mediaLink": "https://res.cloudinary.com/dohdm64xs/video/upload/q_auto/f_auto/v1779133920/vedio_qjdujw.mp4",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        6760,
+        1380
+      ],
+      "id": "9da00951-c3c1-4a3f-aa6e-9a980234b466",
+      "name": "Send message5",
+      "webhookId": "ce97f9fb-0545-466b-ae0e-bb7272620ca6",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Clean Hi-Tea Tag').first().json.fromNumber }}",
+        "messageType": "image",
+        "mediaLink": "https://res.cloudinary.com/dohdm64xs/image/upload/q_auto/f_auto/v1779133899/alll_day_buffet_n0pucs.jpg",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        6500,
+        1680
+      ],
+      "id": "11f74384-cfda-438f-8841-0fe728894b6d",
+      "name": "Send message6",
+      "webhookId": "f723c9a6-a36d-4717-8a21-4b735b99a6ab",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v18.0/1158115170708020/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"status\": \"read\",\n  \"message_id\": \"{{ $(\"Edit Fields\").first().json.messages[0].id }}\"\n}",
+        "options": {}
+      },
+      "id": "075b5e3f-507e-4084-9bc8-7ce853f76484",
+      "name": "Mark As Read1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4940,
+        -600
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v18.0/1158115170708020/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"status\": \"read\",\n  \"message_id\": \"{{ $(\"Edit Fields\").first().json.messages[0].id }}\"\n}",
+        "options": {}
+      },
+      "id": "44cd0f1c-5edc-441b-8c1e-23e0d19c9d96",
+      "name": "Mark As Read3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4940,
+        -20
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v18.0/1158115170708020/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"status\": \"read\",\n  \"message_id\": \"{{ $(\"Edit Fields\").first().json.messages[0].id }}\"\n}",
+        "options": {}
+      },
+      "id": "ab3bfe60-5e4e-4bcf-a5fa-03753dce72f4",
+      "name": "Mark As Read4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4940,
+        1450
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Edit Fields').first().json.fromNumber }}",
+        "textBody": "Thank you!    We're connecting you to a human agent right now. Please hold for just a moment. 🙏",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        7200,
+        -600
+      ],
+      "id": "4143ad9d-a041-4f7f-a2cd-22917a7b3f92",
+      "name": "Human Agent Node",
+      "webhookId": "a293b172-a171-4b5c-b895-d3ba5fd15996",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output;\n\n// Strip markdown code block wrapper (```json ... ```)\nconst cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n\nconst booking = JSON.parse(cleaned);\n\nreturn [{ json: booking }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4940,
+        -320
+      ],
+      "id": "58ae51eb-3392-4ce1-a019-2c2b36e22cd8",
+      "name": "Booking Code"
+    },
+    {
+      "parameters": {
+        "jsCode": "const booking = $input.first().json;\nconst order = booking.order || {};\nconst packageName = String(order.package || '').trim();\nlet category = String(order.category || '').trim();\nif (!category || category === 'Wedding Package') {\nif (/hi[\\s-]?tea|hitea/i.test(packageName)) category = 'Hi-Tea Buffet';\nelse if (/dinner|buffet/i.test(packageName)) category = 'Dinner Buffet';\nelse if (/pool|gym|swim/i.test(packageName)) category = 'Pool/Gym';\nelse if (/wedding|shaadi|shadi|nikah|walima|mehndi/i.test(packageName)) category = 'Wedding';\nelse if (/room|accommodation|suite/i.test(packageName)) category = 'Rooms';\nelse if (/movie\\s*night|auditorium/i.test(packageName)) category = 'Auditorium / Movie Night + Hi-Tea';\nelse if (/a\\s*la\\s*carte|alacarte|restaurant|table/i.test(packageName)) category = '\\u00c0 la carte / Restaurant Reservation';\nelse if (/corporate|conference|meeting/i.test(packageName)) throw new Error('Corporate bookings must be handled through the corporate event request flow.');\nelse throw new Error('Choose a configured booking category from the live CRM menu.');\n}\nif (category === 'Wedding Package') category = 'Wedding';\nif (category === 'A la carte / Restaurant Reservation') category = '\\u00c0 la carte / Restaurant Reservation';\nif (category === 'Corporate') throw new Error('Corporate bookings must be handled through the corporate event request flow.');\nconst date = String(order.date || '').slice(0, 10);\nconst parsedDate = new Date(date + 'T00:00:00.000Z');\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) throw new Error('Check-in date must be a valid YYYY-MM-DD date.');\nconst persons = Number(order.persons);\nif (!Number.isInteger(persons) || persons < 1) throw new Error('Guest count must be a positive whole number.');\nif (category === 'Rooms') {\n  const checkOutDate = String(order.checkOutDate || '').slice(0, 10);\n  const parsedCheckOut = new Date(checkOutDate + 'T00:00:00.000Z');\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(checkOutDate) || Number.isNaN(parsedCheckOut.getTime()) || parsedCheckOut.toISOString().slice(0, 10) !== checkOutDate || checkOutDate <= date) throw new Error('Room check-out must be a valid date after check-in.');\n  if (!/^[a-f0-9]{24}$/i.test(String(order.roomTypeId || ''))) throw new Error('Choose a configured room type from the live CRM room list.');\n  const rooms = Number(order.numberOfRooms || 1);\n  if (!Number.isInteger(rooms) || rooms < 1 || rooms > 100) throw new Error('Room count must be a whole number from 1 to 100.');\n  const query = new URLSearchParams({ restaurantId: 'restaurant-1', checkInDate: date, checkOutDate, roomTypeId: String(order.roomTypeId), rooms: String(rooms), guests: String(persons) });\n  return [{ json: { ...booking, availabilityUrl: 'https://magenta-yak-337378.hostingersite.com/api/rooms/availability/check?' + query } }];\n}\nconst timeMatch = String(order.time || '').trim().match(/^(\\d{1,2})(?::(\\d{2}))?\\s*(AM|PM)?$/i);\nif (!timeMatch) throw new Error('Booking time must be a valid time such as 7:00 PM.');\nlet hour = Number(timeMatch[1]);\nconst minute = Number(timeMatch[2] || 0);\nif (minute > 59 || hour > 23 || (timeMatch[3] && (hour < 1 || hour > 12))) throw new Error('Booking time is invalid.');\nif (timeMatch[3]) hour = hour % 12 + (timeMatch[3].toUpperCase() === 'PM' ? 12 : 0);\nconst time = ('0' + hour).slice(-2) + ':' + ('0' + minute).slice(-2);\nconst query = new URLSearchParams({ restaurantId: 'restaurant-1', date, time, persons: String(persons), category });\nreturn [{ json: { ...booking, availabilityUrl: 'https://magenta-yak-337378.hostingersite.com/api/slots/availability?' + query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5200,
+        -320
+      ],
+      "id": "c1ed0eb2-ad12-4562-95a1-caf13c1639c1",
+      "name": "Prepare booking slot check",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.availabilityUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5460,
+        -320
+      ],
+      "id": "63dec49e-c56f-469a-9a64-4ca29e535b51",
+      "name": "Check booking slot availability",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f6f41dce-8777-40ae-b80d-39795b7fe2d6",
+              "leftValue": "={{ String($json.available) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5720,
+        -320
+      ],
+      "id": "84bb1c98-3cbc-496f-b42f-8fedfeef9eed",
+      "name": "Requested booking slot available?"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Edit Fields3').first().json.fromNumber }}",
+        "textBody": "={{ 'Sorry, that time is not available for this package. ' + ($json.alternatives?.length ? 'Available alternatives:\\n' + $json.alternatives.map((slot) => `${slot.date} · ${slot.label}`).join('\\n') + '\\nPlease tell me which option you prefer.' : 'Please choose another date or time and I will check it for you.') }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        5980,
+        -220
+      ],
+      "id": "36e13d5a-67c8-42ab-88e9-ab607e9fed91",
+      "name": "Offer available booking slots",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ $('Edit Fields3').first().json.fromNumber }}",
+        "textBody": "=Dear {{ JSON.parse($('HTTP Request2').first().json.data).data.customerName }},\n\nWe have received your booking request. Please pay the 20% advance below so our team can verify it and confirm your reservation.\n\n*Booking reference*: {{ JSON.parse($('HTTP Request2').first().json.data).data._id }}\n*Package*: {{ JSON.parse($('HTTP Request2').first().json.data).data.package }}\n*Date*: {{ new Date(JSON.parse($('HTTP Request2').first().json.data).data.bookingDate).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Karachi' }) }}\n{{ JSON.parse($('HTTP Request2').first().json.data).data.roomType ? '*Room type*: ' + JSON.parse($('HTTP Request2').first().json.data).data.roomType + '\\n*Rooms*: ' + JSON.parse($('HTTP Request2').first().json.data).data.numberOfRooms + '\\n*Check-out*: ' + new Date(JSON.parse($('HTTP Request2').first().json.data).data.checkOutDate).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Karachi' }) : '*Time*: ' + JSON.parse($('HTTP Request2').first().json.data).data.bookingTime }}\n*Guests*: {{ JSON.parse($('HTTP Request2').first().json.data).data.numberOfPersons }}\n*Total*: Rs {{ Number(JSON.parse($('HTTP Request2').first().json.data).data.totalAmount).toLocaleString('en-PK') }}\n*20% advance*: Rs {{ Number(JSON.parse($('HTTP Request2').first().json.data).data.advanceAmount).toLocaleString('en-PK') }}\n\n*Bank*: {{ JSON.parse($('HTTP Request2').first().json.data).paymentInstructions.bankName }}\n*Account title*: {{ JSON.parse($('HTTP Request2').first().json.data).paymentInstructions.accountTitle }}\n*Account number*: {{ JSON.parse($('HTTP Request2').first().json.data).paymentInstructions.accountNumber }}\n*IBAN*: {{ JSON.parse($('HTTP Request2').first().json.data).paymentInstructions.iban }}\n\nAfter paying, please send your payment screenshot here on WhatsApp. Your booking will be confirmed only after our team verifies the advance.\n\nThank you, Hotel d'GATES.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        6500,
+        -500
+      ],
+      "id": "5e5b284c-aabc-46ce-83d0-55cc3df4a8ae",
+      "name": "Booking",
+      "webhookId": "2feaeb1a-0bb0-43cf-bdec-14a50674eaec",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Edit Fields3').first().json.fromNumber }}",
+        "textBody": "={{ $('AI Agent').first().json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        5460,
+        1450
+      ],
+      "id": "5124eb9d-cc1c-442b-9e47-d261eb88de1d",
+      "name": "Normal Reply Node",
+      "webhookId": "ffbf2182-3959-4a5e-94a0-a3efb9674abe",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Clean Dinner Tag').first().json.fromNumber }}",
+        "messageType": "image",
+        "mediaLink": "https://res.cloudinary.com/dohdm64xs/image/upload/q_auto/f_auto/v1779132308/dinner_gfbcmp.jpg",
+        "additionalFields": {
+          "mediaCaption": "Are you interested? If yes, I’ll start your booking process."
+        }
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        6500,
+        1900
+      ],
+      "id": "82987238-cb9d-4487-bc71-da1151b0edda",
+      "name": "Send Dinner Image",
+      "webhookId": "89c4b7d3-be93-45e8-8119-35365118ebb3",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Clean Wedding Tag').first().json.fromNumber }}",
+        "messageType": "image",
+        "mediaLink": "https://res.cloudinary.com/dohdm64xs/image/upload/q_auto/f_auto/v1779132990/weding_1_mlhirl.jpg",
+        "additionalFields": {
+          "mediaCaption": "Select & booking Now"
+        }
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        6500,
+        2100
+      ],
+      "id": "1ec47470-49c7-4655-9d5c-9a94bc39f25f",
+      "name": "Send message",
+      "webhookId": "82d43c51-57a3-4cac-8b5d-3472f9f1d64b",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Clean Pool Tag').first().json.fromNumber }}",
+        "messageType": "image",
+        "mediaLink": "https://res.cloudinary.com/dohdm64xs/image/upload/q_auto/f_auto/v1779133086/pool_fmmhqo.jpg",
+        "additionalFields": {
+          "mediaCaption": "=🏋️ *FITNESS + POOL*\n\n*Gym*:Rs. 7,999/month Pool\n\n*(Per Person)*: Rs. 2,500\n\n*Kids Deal*: Rs. 15,000 \n\n*Family Deal*: Rs. 30,000\n\n*Mega Family Deal*: Rs. 90,000"
+        }
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        6760,
+        2100
+      ],
+      "id": "1f1f9d48-984f-481e-aa16-40464647649e",
+      "name": "Send message1",
+      "webhookId": "6e11f134-defb-4d6b-b5ed-447f51fc5f2d",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v18.0/1158115170708020/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"status\": \"read\",\n  \"message_id\": \"{{ $(\"Edit Fields\").first().json.messages[0].id }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5460,
+        540
+      ],
+      "id": "61f69568-7af9-4698-8818-fa30d7cde921",
+      "name": "HTTP Request1",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let output = $input.first().json.output || '';\noutput = output.replace(/\\*\\*\\*SEND_WEDDING_IMAGES\\*\\*\\*/g, '').trim();\nreturn [{ json: { output, category: 'Wedding Package', fromNumber: $('Edit Fields3').first().json.fromNumber } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5200,
+        540
+      ],
+      "id": "3997ac79-524f-47e4-90da-1619ab660960",
+      "name": "Clean Wedding Tag"
+    },
+    {
+      "parameters": {
+        "jsCode": "let output = $input.first().json.output || '';\noutput = output.replace(/\\*\\*\\*SEND_DINNER_IMAGES\\*\\*\\*/g, '').trim();\nreturn [{ json: { output, category: 'Dinner Buffet', fromNumber: $('Edit Fields3').first().json.fromNumber } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5200,
+        260
+      ],
+      "id": "065a6bb2-b97c-4d68-a6ac-420a6024f1c0",
+      "name": "Clean Dinner Tag"
+    },
+    {
+      "parameters": {
+        "jsCode": "let output = $input.first().json.output || '';\noutput = output.replace(/\\*\\*\\*SEND_POOL_IMAGES\\*\\*\\*/g, '').trim();\nreturn [{ json: { output, category: 'Pool/Gym', fromNumber: $('Edit Fields3').first().json.fromNumber } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5200,
+        820
+      ],
+      "id": "cf9b9977-841b-449d-b57e-cd178115071a",
+      "name": "Clean Pool Tag"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Clean Hi-Tea Tag').first().json.fromNumber }}",
+        "messageType": "audio",
+        "mediaLink": "https://res.cloudinary.com/dohdm64xs/video/upload/q_auto/f_auto/v1779133881/hi_tea_voice_wleket.ogg",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        6760,
+        1680
+      ],
+      "id": "981efa29-4654-4105-a512-730e6a10ddec",
+      "name": "Send message3",
+      "webhookId": "8f8ca944-9339-4223-871f-b88d1cb47e3d",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/menus/public?restaurantId=restaurant-1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3380,
+        140
+      ],
+      "id": "cc8345bc-bf2e-45a3-a145-fc85146e1fbe",
+      "name": "Get current CRM menus",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://magenta-yak-337378.hostingersite.com/api/settings/service-closures/status?restaurantId=' + encodeURIComponent($('Edit Fields3').first().json.resturantId || 'restaurant-1') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3640,
+        60
+      ],
+      "id": "ba7e87af-9017-4b46-95cf-8a829e042ac1",
+      "name": "Get CRM service closures",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const menuResponse = $('Get current CRM menus').first().json;\nconst roomTypeResponse = $('Get current CRM room types').first().json;\nconst roomTypes = Array.isArray(roomTypeResponse.data) ? roomTypeResponse.data.filter((room) => room.isActive !== false).map(({ _id, name, baseRate, totalRooms, maxGuestsPerRoom, description, amenities }) => ({ roomTypeId: _id, name, nightlyRate: baseRate, totalRooms, maxGuestsPerRoom, description, amenities })) : [];\nconst menus = Array.isArray(menuResponse.data) ? menuResponse.data : [];\nconst conciseMenus = menus.filter((menu) => menu.isActive !== false).map((menu) => ({\n  category: menu.category, title: menu.title, subtitle: menu.subtitle, badge: menu.badge, closingLine: menu.closingLine,\n  price: menu.price, priceNote: menu.priceNote, menuTimeSlots: menu.menuTimeSlots || [], menuSections: menu.menuSections || [], roomCheckInTime: menu.roomCheckInTime || \"\", roomCheckOutTime: menu.roomCheckOutTime || \"\", roomStayDurationHours: menu.roomStayDurationHours || null, hotelInfo: menu.hotelInfo || {},\n  description: menu.description, dishes: menu.dishes || [], weddingPackages: menu.weddingPackages || [],\n  weddingVenues: menu.weddingVenues || [], weddingSaladOptions: menu.weddingSaladOptions || [], weddingDessertOptions: menu.weddingDessertOptions || [], extraPrices: menu.extraPrices || [],\n  media: { imageUrls: menu.media?.imageUrls || [], pdfUrls: menu.media?.pdfUrls || [], videoUrl: menu.media?.videoUrl || \"\", voiceNoteUrl: menu.media?.voiceNoteUrl || \"\" },\n  activeOffers: (menu.activeOffers || []).map(({ title, description, discountText }) => ({ title, description, discountText })),\n}));\nconst closureResponse = $input.first().json;\nconst closureData = closureResponse.data || {};\nconst closures = Array.isArray(closureData.closures) ? closureData.closures : [];\nconst closureContext = JSON.stringify({\n  currentDateInPakistan: closureData.today || 'Unknown',\n  priorityInstruction: 'Check these closures before greeting or replying about availability/booking. If today is closed, tell the customer the exact reason immediately. Never promise or create a booking on a listed closed date.',\n  closures: closures.map(({ date, reason }) => ({ date, reason })),\n});\nconst source = $('Edit Fields3').first().json;\nreturn [{ json: { ...source, menuContext: JSON.stringify(conciseMenus), roomTypesContext: JSON.stringify(roomTypes), closureContext } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3900,
+        140
+      ],
+      "id": "46951624-4139-490c-8520-e020332ee647",
+      "name": "Prepare CRM menu context"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "image-media-condition",
+              "leftValue": "={{ $json.messageType }}",
+              "rightValue": "image",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "video-media-condition",
+              "leftValue": "={{ $json.messageType }}",
+              "rightValue": "video",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "document-media-condition",
+              "leftValue": "={{ $json.messageType }}",
+              "rightValue": "document",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        520,
+        0
+      ],
+      "id": "e2491b5c-d580-4190-8c25-6a897912ebdd",
+      "name": "Is incoming supported media"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/bookings/payment-screenshot",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"restaurantId\": \"restaurant-1\",\n  \"customerPhone\": \"{{ $('Edit Fields').first().json.fromNumber }}\",\n  \"mediaId\": \"{{ $('Edit Fields').first().json.mediaId }}\",\n  \"mediaType\": \"{{ $('Edit Fields').first().json.messageType }}\",\n  \"caption\": \"{{ $('Edit Fields').first().json.userMessage }}\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        780,
+        350
+      ],
+      "id": "42955414-51ce-4a5f-b62b-98dd45f75725",
+      "name": "Save WhatsApp media to Cloudinary and CRM",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "043df19b-82b4-4af6-a66d-dd4b8f6a4bcb",
+              "leftValue": "={{ String($json.attachedToBooking) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1040,
+        350
+      ],
+      "id": "7d48b7a3-e1b3-4dde-95c9-abeb29901733",
+      "name": "Payment proof linked to booking?"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Edit Fields').first().json.fromNumber }}",
+        "textBody": "We received your payment proof. Our customer service team is verifying it and will send your booking confirmation once the advance is confirmed. Thank you.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        270
+      ],
+      "id": "db1e6576-a72b-4e32-99bc-0e2b2ce776b6",
+      "name": "Acknowledge payment proof",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6a3cc27e-482a-4cb9-bf23-e32a2f1600b6",
+              "leftValue": "={{ String(JSON.parse($json.data).paymentInstructions.configured) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6240,
+        -420
+      ],
+      "id": "4d13039e-30c6-41bf-b216-b188cce411b6",
+      "name": "Payment account configured?"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Edit Fields').first().json.fromNumber }}",
+        "textBody": "We received your file and saved it for our team to review. Thank you.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        430
+      ],
+      "id": "c7f27fb7-c548-428f-8204-9221507f861b",
+      "name": "Acknowledge customer media",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $('Edit Fields3').first().json.toNumber }}",
+        "recipientPhoneNumber": "={{ '+' + $json.fromNumber }}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        5720,
+        130
+      ],
+      "id": "9d80e7b1-4f14-48f1-9f3a-b54b9a7f5b85",
+      "name": "Send CRM menu reply",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const source = $input.first().json;\nconst response = $('Get current CRM menus').first().json;\nconst menus = Array.isArray(response.data) ? response.data : [];\nconst menu = menus.find((item) => item.category === source.category && item.isActive !== false);\nif (!menu) return [];\nconst media = menu.media || {};\nconst assets = [\n  ...(media.imageUrls || []).map((url) => ({ type: 'image', url, caption: menu.captionAfterImage || '' })),\n  ...(media.pdfUrls || []).map((url) => ({ type: 'document', url, filename: url.split('/').pop().split('?')[0] || 'menu.pdf' })),\n  ...(media.videoUrl ? [{ type: 'video', url: media.videoUrl }] : []),\n  ...(media.voiceNoteUrl ? [{ type: 'audio', url: media.voiceNoteUrl }] : []),\n];\nreturn assets\n  .filter((asset) => typeof asset.url === 'string' && /^https:\\/\\//i.test(asset.url))\n  .map((asset) => ({ json: { ...asset, to: source.fromNumber } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5720,
+        350
+      ],
+      "id": "bd387c48-15ea-476e-a3bb-669f51f3c734",
+      "name": "Build CRM menu media"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $('Edit Fields3').first().json.toNumber }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { messaging_product: 'whatsapp', recipient_type: 'individual', to: $json.to, type: $json.type, [$json.type]: $json.type === 'document' ? { link: $json.url, filename: $json.filename } : { link: $json.url, ...($json.caption ? { caption: $json.caption } : {}) } } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5980,
+        350
+      ],
+      "id": "9719feaa-d700-4aeb-9e6b-b8e4f19e8d08",
+      "name": "Send CRM menu media",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "id": "cfd180d0-87fc-4b11-bcd7-2e95125bae4a",
+      "name": "Get current CRM room types",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3640,
+        220
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/rooms/types/public?restaurantId=restaurant-1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/weddings/enquiries/flow",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { restaurantId: 'restaurant-1', customerPhone: $('Edit Fields3').first().json.fromNumber, customerName: $('Edit Fields3').first().json.contacts?.[0]?.profile?.name || '', message: $('Edit Fields3').first().json.userMessage, isWeddingStart: /\\b(wedding|marriage|shaadi|shadi|mehndi|baraat|walima|nikah|nikkah|engagement)\\b/i.test(String($('Edit Fields3').first().json.userMessage || '')) } }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2860,
+        -220
+      ],
+      "id": "dca9456a-2634-4f36-b73f-fa925f792a4b",
+      "name": "Handle wedding enquiry flow",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "29db95d2-115c-4601-9ccb-9533d095881a",
+              "leftValue": "={{ String($json.data.active === true) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3120,
+        -220
+      ],
+      "id": "d8c96a4d-39c0-4876-9482-8f37a769de04",
+      "name": "Is wedding enquiry active?"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Edit Fields3').first().json.fromNumber }}",
+        "textBody": "={{ $('Handle wedding enquiry flow').first().json.data.replyText }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3380,
+        -300
+      ],
+      "id": "10367144-afbd-4536-8164-c79a6b7adf00",
+      "name": "Send wedding enquiry reply",
+      "webhookId": "af3d5562-20b9-410f-937e-638e69d04ae8",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/chats/whatsapp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { customerId: $('Edit Fields3').first().json.fromNumber, customerMessage: $('Edit Fields3').first().json.userMessage || '', botReply: $('Handle wedding enquiry flow').first().json.data.replyText, fromNumber: $('Edit Fields3').first().json.fromNumber, phone: $('Edit Fields3').first().json.fromNumber, direction: 'bot', source: 'wedding_booking', restaurantId: 'restaurant-1' } }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3380,
+        -140
+      ],
+      "id": "142057e0-42e0-4d74-87a3-ed74c507f9f0",
+      "name": "Log wedding enquiry chat",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/corporate/enquiries/flow",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { restaurantId: 'restaurant-1', customerPhone: $('Edit Fields3').first().json.fromNumber, customerName: $('Edit Fields3').first().json.contacts?.[0]?.profile?.name || '', message: $('Edit Fields3').first().json.userMessage, isCorporateStart: /\\b(corporate|conference|seminar|business meeting|company event|office event)\\b/i.test(String($('Edit Fields3').first().json.userMessage || '')) } }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2860,
+        -520
+      ],
+      "id": "3b00d021-6ef5-4541-9690-86ebd8179d0f",
+      "name": "Handle corporate enquiry flow",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "48cc2f03-2ded-4b57-975e-451cc4fece25",
+              "leftValue": "={{ String($json.data.active === true) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3120,
+        -520
+      ],
+      "id": "b88d920f-2fe9-40f8-b19b-ab1cee3373a1",
+      "name": "Is corporate enquiry active?"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Edit Fields3').first().json.fromNumber }}",
+        "textBody": "={{ $('Handle corporate enquiry flow').first().json.data.replyText }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3380,
+        -600
+      ],
+      "id": "d8062a14-2d5b-4a3b-99a2-f58696f43165",
+      "name": "Send corporate enquiry reply",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/chats/whatsapp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { customerId: $('Edit Fields3').first().json.fromNumber, customerMessage: $('Edit Fields3').first().json.userMessage || '', botReply: $('Handle corporate enquiry flow').first().json.data.replyText, fromNumber: $('Edit Fields3').first().json.fromNumber, phone: $('Edit Fields3').first().json.fromNumber, direction: 'bot', source: 'corporate_booking', restaurantId: 'restaurant-1' } }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3380,
+        -440
+      ],
+      "id": "9bf17ff9-2ed8-439b-8c5e-c34b66257e3d",
+      "name": "Log corporate enquiry chat",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/inquiry-learning/public?restaurantId=restaurant-1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3640,
+        420
+      ],
+      "id": "3d727bd6-bcc0-46c6-90a6-c16587d65b20",
+      "name": "Get active inquiry learning",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/settings/agent-prompt/public?restaurantId=restaurant-1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4160,
+        40
+      ],
+      "id": "a2c802f6-8b5d-45c8-947a-8b9a50268747",
+      "name": "Get live AI Agent prompt",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = String($input.first().json.output || '').replace(/\\x60\\x60\\x60(?:json)?/gi, '').trim();\nconst result = JSON.parse(raw);\nif (result.action !== 'create_reminder' || !result.reminder || !result.reminder.reason) throw new Error('AI follow-up reminder output is incomplete.');\nconst event = $('Edit Fields').first().json;\nconst message = event.messages?.[0] || {};\nconst receivedAt = new Date(Number(message.timestamp) * 1000);\nif (!message.id || Number.isNaN(receivedAt.getTime())) throw new Error('WhatsApp message ID or timestamp is missing.');\nreturn [{ json: { restaurantId: 'restaurant-1', fromNumber: $('Edit Fields3').first().json.fromNumber, customerName: String(result.customer?.name || event.contacts?.[0]?.profile?.name || '').trim(), reason: result.reminder.reason, customerMessage: String(result.reminder.customerMessage || $('Edit Fields3').first().json.userMessage || '').trim(), receivedAt: receivedAt.toISOString(), sourceMessageId: message.id, reply: String(result.reply || '').trim() } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4940,
+        1100
+      ],
+      "id": "7ccc9395-0482-415d-a4d8-092833577cc2",
+      "name": "Prepare follow-up reminder",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/reminders/from-whatsapp",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { fromNumber: $json.fromNumber, restaurantId: $json.restaurantId, customerName: $json.customerName, reason: $json.reason, customerMessage: $json.customerMessage, receivedAt: $json.receivedAt, sourceMessageId: $json.sourceMessageId } }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5200,
+        1100
+      ],
+      "id": "a8426786-580e-4373-9e0c-61d8c6cdcd26",
+      "name": "Schedule configurable follow-up",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Prepare follow-up reminder').first().json.fromNumber }}",
+        "textBody": "={{ $('Prepare follow-up reminder').first().json.reply }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        5460,
+        1040
+      ],
+      "id": "9d7f8e20-0fc5-49ae-9292-722fc87b8458",
+      "name": "Confirm follow-up scheduled",
+      "webhookId": "ffbf2182-3959-4a5e-94a0-a3efb9674abe",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1158115170708020",
+        "recipientPhoneNumber": "={{ '+' + $('Prepare follow-up reminder').first().json.fromNumber }}",
+        "textBody": "Maazrat, abhi aapka follow-up reminder set nahi ho saka. Hamari team se dobara rabta karein.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        5460,
+        1200
+      ],
+      "id": "45e1f040-8913-4dfe-8170-e9d754461ead",
+      "name": "Tell customer follow-up failed",
+      "webhookId": "ffbf2182-3959-4a5e-94a0-a3efb9674abe",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "WPHPFCQfQQ28LtRs",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://magenta-yak-337378.hostingersite.com/api/reminders/customer-replied",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { restaurantId: 'restaurant-1', fromNumber: $('Edit Fields3').first().json.fromNumber } }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2600,
+        0
+      ],
+      "id": "446384bb-cf1f-48a1-bf66-aa818ce2d657",
+      "name": "Cancel reminder on customer reply",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## 1 · Incoming messages\nWhatsApp Trigger → normalize sender/message fields → classify supported media and message type.",
+        "height": 150,
+        "width": 820,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -420
+      ],
+      "id": "ea18bbf6-2cdf-47a1-8574-64f4bf8b83e5",
+      "name": "Section — Incoming messages"
+    },
+    {
+      "parameters": {
+        "content": "## 2 · Media & voice intake\nIncoming files are saved through the existing CRM flow. Audio is downloaded and transcribed before joining the text path.",
+        "height": 150,
+        "width": 1050,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        950,
+        -500
+      ],
+      "id": "a7f1737c-1383-4fc2-8823-9afc3dfe59cb",
+      "name": "Section — Media and voice"
+    },
+    {
+      "parameters": {
+        "content": "## 3 · Event enquiries\nCorporate and wedding enquiry handlers run before the general AI response path; handoff branches remain connected.",
+        "height": 150,
+        "width": 850,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2760,
+        -850
+      ],
+      "id": "358a59e5-79d4-46ee-a680-a715a97a307a",
+      "name": "Section — Event enquiry flows"
+    },
+    {
+      "parameters": {
+        "content": "## 4 · Live CRM context & AI\nLoad current menus, closures, room types, inquiry learning and the configured prompt before generating a reply.",
+        "height": 150,
+        "width": 1250,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3560,
+        -480
+      ],
+      "id": "e0e461e6-7122-42c9-948b-6a56bcdfcea4",
+      "name": "Section — CRM context and AI"
+    },
+    {
+      "parameters": {
+        "content": "## 5 · Intent routing & booking\nThe existing Switch routes booking, menu, reminder and regular-reply intents. Booking paths check availability before continuing.",
+        "height": 150,
+        "width": 1500,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        4860,
+        -850
+      ],
+      "id": "71710498-53a8-492a-a244-45e53777bcc6",
+      "name": "Section — Intent routing and booking"
+    },
+    {
+      "parameters": {
+        "content": "## 6 · Menu replies\nCategory branches keep their existing routing and converge on the current CRM menu text/media send actions.",
+        "height": 140,
+        "width": 1050,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        5860,
+        560
+      ],
+      "id": "548bcf94-98af-47f6-b761-de5585c2bc48",
+      "name": "Section — Menu response branches"
+    },
+    {
+      "parameters": {
+        "content": "## 7 · Follow-up & regular reply\nThe scheduled follow-up success/failure paths and regular customer reply remain separate outcomes.",
+        "height": 140,
+        "width": 1350,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        4860,
+        900
+      ],
+      "id": "f5d8ad7d-5105-477b-b6ab-77de722ae968",
+      "name": "Section — Follow-up and reply outcomes"
+    },
+    {
+      "parameters": {
+        "content": "## 8 · Human-agent handoff\nExisting escalation routes converge here before the handoff message is sent to the customer.",
+        "height": 140,
+        "width": 850,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        7000,
+        -850
+      ],
+      "id": "c23fa286-fd52-4f49-bac0-4088747f242d",
+      "name": "Section — Human agent handoff"
+    },
+    {
+      "parameters": {
+        "content": "## 9 · Additional WhatsApp nodes\nThese existing standalone/auxiliary message nodes are kept separate from the primary connected routes and left unchanged.",
+        "height": 140,
+        "width": 1050,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        6380,
+        1160
+      ],
+      "id": "52c56a9b-550a-475f-8f04-fc5b9b0507e1",
+      "name": "Section — Additional WhatsApp nodes"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Is incoming supported media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF CONDTION (audio true , text false)": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request read url audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request read url audio": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request download audio from url and send to gemini in binary format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request download audio from url and send to gemini in binary format": {
+      "main": [
+        [
+          {
+            "node": "Transcribe a recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe a recording": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Cancel reminder on customer reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle corporate enquiry flow": {
+      "main": [
+        [
+          {
+            "node": "Is corporate enquiry active?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is corporate enquiry active?": {
+      "main": [
+        [
+          {
+            "node": "Send corporate enquiry reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle wedding enquiry flow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send corporate enquiry reply": {
+      "main": [
+        [
+          {
+            "node": "Log corporate enquiry chat",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log corporate enquiry chat": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Mark As Read1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Booking Code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark As Read3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clean Dinner Tag",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clean Wedding Tag",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clean Pool Tag",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare follow-up reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark As Read4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Payment account configured?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Normal Reply Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "IF CONDTION (audio true , text false)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Hi-Tea Tag": {
+      "main": [
+        [
+          {
+            "node": "Send CRM menu reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build CRM menu media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message4": {
+      "main": [
+        []
+      ]
+    },
+    "Send message5": {
+      "main": [
+        []
+      ]
+    },
+    "Mark As Read1": {
+      "main": [
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark As Read3": {
+      "main": [
+        [
+          {
+            "node": "Clean Hi-Tea Tag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark As Read4": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Agent Node": {
+      "main": [
+        [
+          {
+            "node": "Send message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Code": {
+      "main": [
+        [
+          {
+            "node": "Prepare booking slot check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare booking slot check": {
+      "main": [
+        [
+          {
+            "node": "Check booking slot availability",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check booking slot availability": {
+      "main": [
+        [
+          {
+            "node": "Requested booking slot available?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requested booking slot available?": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Offer available booking slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        []
+      ]
+    },
+    "Clean Wedding Tag": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send CRM menu reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build CRM menu media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Dinner Tag": {
+      "main": [
+        [
+          {
+            "node": "Send CRM menu reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build CRM menu media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Pool Tag": {
+      "main": [
+        [
+          {
+            "node": "Send CRM menu reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build CRM menu media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message6": {
+      "main": [
+        [
+          {
+            "node": "Send message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get current CRM menus": {
+      "main": [
+        [
+          {
+            "node": "Get CRM service closures",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get current CRM room types",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare CRM menu context": {
+      "main": [
+        [
+          {
+            "node": "Get live AI Agent prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment proof linked to booking?": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge payment proof",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Acknowledge customer media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment account configured?": {
+      "main": [
+        [
+          {
+            "node": "Booking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get CRM service closures": {
+      "main": [
+        [
+          {
+            "node": "Prepare CRM menu context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get active inquiry learning": {
+      "main": [
+        [
+          {
+            "node": "Prepare CRM menu context",
+            "type": "main",
+            "index": 2
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is incoming supported media": {
+      "main": [
+        [
+          {
+            "node": "Save WhatsApp media to Cloudinary and CRM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF CONDTION (audio true , text false)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save WhatsApp media to Cloudinary and CRM": {
+      "main": [
+        [
+          {
+            "node": "Payment proof linked to booking?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build CRM menu media": {
+      "main": [
+        [
+          {
+            "node": "Send CRM menu media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get current CRM room types": {
+      "main": [
+        [
+          {
+            "node": "Prepare CRM menu context",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle wedding enquiry flow": {
+      "main": [
+        [
+          {
+            "node": "Is wedding enquiry active?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is wedding enquiry active?": {
+      "main": [
+        [
+          {
+            "node": "Send wedding enquiry reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get current CRM menus",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send wedding enquiry reply": {
+      "main": [
+        [
+          {
+            "node": "Log wedding enquiry chat",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log wedding enquiry chat": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Human Agent Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get live AI Agent prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare follow-up reminder": {
+      "main": [
+        [
+          {
+            "node": "Schedule configurable follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tell customer follow-up failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule configurable follow-up": {
+      "main": [
+        [
+          {
+            "node": "Confirm follow-up scheduled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tell customer follow-up failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm follow-up scheduled": {
+      "main": [
+        []
+      ]
+    },
+    "Tell customer follow-up failed": {
+      "main": [
+        []
+      ]
+    },
+    "Cancel reminder on customer reply": {
+      "main": [
+        [
+          {
+            "node": "Handle corporate enquiry flow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
