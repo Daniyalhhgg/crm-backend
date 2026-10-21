@@ -267,7 +267,7 @@ const bookingSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "confirmed", "checked_in", "completed", "cancelled", "no_show"],
+      enum: ["pending", "pending_payment_verification", "confirmed", "checked_in", "completed", "cancelled", "no_show"],
       default: "pending",
       index: true,
     },
@@ -282,6 +282,33 @@ const bookingSchema = new mongoose.Schema(
     notes: {
       type: String,
       default: "",
+    },
+    csRemarks: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 1000,
+    },
+    handledBy: {
+      type: String,
+      enum: ["whatsapp-bot", "cs_manual"],
+      default: "whatsapp-bot",
+      index: true,
+    },
+    customerLanguage: {
+      type: String,
+      enum: ["en", "roman", "ur", ""],
+      default: "",
+    },
+    paymentDeclineReason: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 500,
+    },
+    paymentProofConfirmedByCustomer: {
+      type: Boolean,
+      default: false,
     },
 
     chatHistoryId: {
@@ -301,7 +328,7 @@ const bookingSchema = new mongoose.Schema(
     },
     totalAmount: { type: Number, min: 0, default: 0 },
     advanceAmount: { type: Number, min: 0, default: 0 },
-    paymentStatus: { type: String, enum: ["unpaid", "advance_received", "paid", "verifying"], default: "unpaid" },
+    paymentStatus: { type: String, enum: ["unpaid", "payment_declined", "proof_received", "verifying", "advance_received", "paid", "rejected"], default: "unpaid" },
     paymentMethod: { type: String, default: "", trim: true },
     paymentScreenshotUrl: { type: String, default: "", trim: true },
     paymentVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },

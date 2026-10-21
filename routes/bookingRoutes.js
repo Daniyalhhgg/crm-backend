@@ -10,6 +10,9 @@ const {
   updateBooking,
   confirmBooking,
   capturePaymentScreenshot,
+  confirmPaymentProof,
+  declineAdvancePayment,
+  getCustomerBookingContext,
   verifyPayment,
   checkInBooking,
 } = require("../controllers/bookingController");
@@ -21,6 +24,9 @@ const auth = require("../middleware/auth");
 // ======================
 router.post("/from-whatsapp", createBookingFromWhatsApp);
 router.post("/payment-screenshot", capturePaymentScreenshot);
+router.post("/confirm-payment-proof", confirmPaymentProof);
+router.post("/decline-advance", declineAdvancePayment);
+router.get("/customer-context", getCustomerBookingContext);
 router.post("/:id/payment-screenshot", capturePaymentScreenshot);
 
 // ======================

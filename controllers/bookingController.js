@@ -59,33 +59,175 @@ const emitBooking = (req, event, booking) => {
   io.to("chat-admins").emit(event, { bookingId: booking._id, restaurantId: booking.restaurantId, booking });
 };
 const timeString = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-const bookingConfirmationText = (booking) => {
-  const date = new Intl.DateTimeFormat("en-PK", {
+const formatPkDate = (value) => {
+  if (!value) return "Not recorded";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not recorded";
+  return new Intl.DateTimeFormat("en-PK", {
     timeZone: process.env.SLOT_TIMEZONE || "Asia/Karachi",
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(new Date(booking.bookingDate));
+  }).format(date);
+};
+const moneyPk = (value) => `Rs ${Number(value || 0).toLocaleString("en-PK")}`;
+const digitsOnly = (value) => String(value || "").replace(/\D/g, "");
+const detectLanguage = (text, fallback = "en") => {
+  const source = String(text || "");
+  if ([...source].some((character) => {
+    const code = character.codePointAt(0);
+    return code >= 1536 && code <= 1791;
+  })) return "ur";
+  if (/\b(hai|hain|kya|kar|karo|chahiye|mujhe|aap|apko|aapki|aapka|mein|main|nahi|bhi|ka|ki|ke|ko|se|mera|meri|bata|bhej|karein|raha|rahi|theek|han|haan|ji|shukriya)\b/i.test(source)) return "roman";
+  return fallback || "en";
+};
+const bookingDetailLines = (booking) => [
+  `Package: ${booking.package || "Not recorded"}`,
+  booking.bookingCategory ? `Category: ${booking.bookingCategory}` : "",
+  ...(booking.selectedItems || []).map((item) => `Item: ${item.name}${item.quantity > 1 ? ` x${item.quantity}` : ""}`),
+  ...(booking.bookingDetails || []).map((detail) => `${detail.label}: ${detail.value}`),
+  booking.roomType ? `Room type: ${booking.roomType}` : "",
+  booking.roomType ? `Rooms: ${booking.numberOfRooms || 1}` : "",
+  booking.roomType ? `Check-in: ${formatPkDate(booking.bookingDate)}` : `Date: ${formatPkDate(booking.bookingDate)}`,
+  booking.checkOutDate ? `Check-out: ${formatPkDate(booking.checkOutDate)}` : "",
+  booking.roomType ? "" : `Time: ${booking.bookingTime || "Not recorded"}`,
+  `Guests: ${booking.numberOfPersons || "Not recorded"}`,
+  booking.specialRequests ? `Special requests: ${booking.specialRequests}` : "",
+].filter(Boolean);
+const bookingConfirmationText = (booking) => {
+  const language = booking.customerLanguage || "en";
+  const intro = language === "ur"
+    ? `محترم/محترمہ ${booking.customerName},\n\nآپ کی ادائیگی موصول ہو گئی ہے اور تصدیق ہو گئی ہے۔ آپ کی بکنگ کنفرم ہے۔`
+    : language === "roman"
+      ? `Dear ${booking.customerName},\n\nAapki payment receive ho gayi hai aur verify ho gayi hai. Aapki booking confirm hai.`
+      : `Dear ${booking.customerName},\n\nYour payment has been received and verified. Your booking is confirmed.`;
   return [
-    `Dear ${booking.customerName},`,
+    intro,
     "",
-    "Your booking is confirmed.",
-    `Package: ${booking.package}`,
-    ...(booking.roomType ? [
-      `Room type: ${booking.roomType}`,
-      `Rooms: ${booking.numberOfRooms || 1}`,
-      `Check-in: ${date}`,
-      `Check-out: ${booking.checkOutDate ? new Intl.DateTimeFormat("en-PK", { timeZone: process.env.SLOT_TIMEZONE || "Asia/Karachi", day: "2-digit", month: "short", year: "numeric" }).format(new Date(booking.checkOutDate)) : "Not provided"}`,
-    ] : [`Date: ${date}`, `Time: ${booking.bookingTime}`]),
-    `Guests: ${booking.numberOfPersons}`,
-    `Advance received: Rs ${Number(booking.advanceAmount || 0).toLocaleString("en-PK")}`,
+    ...bookingDetailLines(booking),
+    `Total bill: ${moneyPk(booking.totalAmount)}`,
+    `Advance received: ${moneyPk(booking.advanceAmount)}`,
     "",
-    "Thank you for choosing Hotel d'GATES.",
+    language === "ur" ? "Hotel d'GATES کا شکریہ۔" : language === "roman" ? "Hotel d'GATES ka shukriya." : "Thank you for choosing Hotel d'GATES.",
   ].join("\n");
 };
+const customerWaitText = (language) => {
+  if (language === "ur") return "ٹھیک ہے، ہمارے ساتھ جڑے رہیں۔ ہماری ٹیم 1 سے 5 منٹ میں ادائیگی کی تصدیق کر کے آپ کو کنفرم کر دے گی۔";
+  if (language === "roman") return "Theek hai, hamare sath jude rahiye. Hamari team 1 se 5 minutes mein payment verify karke aapko confirm kar degi.";
+  return "Please stay with us. Our team will verify the payment in 1 to 5 minutes and confirm it to you.";
+};
+const customerCsNotifyFailureText = (language) => {
+  if (language === "ur") return "آپ کی تفصیلات محفوظ ہیں، لیکن ہم اس وقت ٹیم کو خودکار اطلاع نہیں دے سکے۔ براہ کرم کسٹمر سروس سے رابطہ کریں؛ ادائیگی ابھی تصدیق شدہ نہیں ہے۔";
+  if (language === "roman") return "Aapki details save hain, lekin team ko automatic notification nahi ja saki. Barah-e-karam customer service se rabta karein; payment abhi verify nahi hui.";
+  return "Your details are saved, but we could not notify the team automatically. Please contact customer service; your payment is not verified yet.";
+};
+const proofConfirmQuestion = (language) => {
+  if (language === "ur") return "کیا یہ ادائیگی کا ثبوت کنفرم ہے؟ براہ کرم ہاں یا نہیں لکھیں۔";
+  if (language === "roman") return "Kya yeh payment proof confirm hai? Please Haan ya Nahi likhein.";
+  return "Is this payment proof confirmed? Please reply Yes or No.";
+};
+async function sendWhatsAppText(to, body) {
+  if (!process.env.WHATSAPP_PHONE_NUMBER_ID || !process.env.WHATSAPP_ACCESS_TOKEN) {
+    throw new Error("WhatsApp Cloud API credentials are not configured.");
+  }
+  await axios.post(
+    `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    {
+      messaging_product: "whatsapp",
+      to: digitsOnly(to),
+      type: "text",
+      text: { body },
+    },
+    { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`, "Content-Type": "application/json" } }
+  );
+}
+async function notifyCsTeam({ caption, mediaUrl, mediaType = "image", mediaFilename = "" }) {
+  const csNumber = process.env.WHATSAPP_CS_TEAM_NUMBER;
+  if (!csNumber) return "Configure WHATSAPP_CS_TEAM_NUMBER to notify CS on WhatsApp.";
+  if (!process.env.WHATSAPP_PHONE_NUMBER_ID || !process.env.WHATSAPP_ACCESS_TOKEN) {
+    throw new Error("WhatsApp Cloud API credentials are not configured.");
+  }
+  const payload = mediaUrl
+    ? {
+      messaging_product: "whatsapp",
+      to: digitsOnly(csNumber),
+      type: mediaType,
+      [mediaType]: {
+        link: mediaUrl,
+        ...(mediaType === "document" && mediaFilename ? { filename: mediaFilename } : {}),
+        ...(["image", "video", "document"].includes(mediaType) ? { caption } : {}),
+      },
+    }
+    : {
+      messaging_product: "whatsapp",
+      to: digitsOnly(csNumber),
+      type: "text",
+      text: { body: caption },
+    };
+  await axios.post(
+    `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    payload,
+    { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`, "Content-Type": "application/json" } }
+  );
+  return "";
+}
+const csPaymentCaption = (booking) => [
+  "*Payment received — please verify*",
+  "",
+  `Customer: ${booking.customerName || "Customer"}`,
+  `WhatsApp: +${digitsOnly(booking.customerPhone)}`,
+  `Category: ${booking.bookingCategory || booking.package || "Booking"}`,
+  `Package: ${booking.package || "Not recorded"}`,
+  ...bookingDetailLines(booking).filter((line) => !line.startsWith("Package:")),
+  `Total bill: ${moneyPk(booking.totalAmount)}`,
+  `Advance due/received: ${moneyPk(booking.advanceAmount)}`,
+  `Booking ID: ${booking._id}`,
+  "",
+  "Customer details are already saved on the Bookings page in this category section.",
+  "Open Bookings → Pending payment verification to view the screenshot and verify.",
+].join("\n");
+const eventPaymentCaption = (booking, type) => [
+  `*${type === "wedding" ? "Wedding" : "Corporate"} payment proof received — please verify*`,
+  "",
+  `Customer: ${booking.customerName || booking.answers?.contactPerson || "Customer"}`,
+  `WhatsApp: +${digitsOnly(booking.customerPhone)}`,
+  `Company/event: ${booking.answers?.companyName || booking.answers?.eventType || type}`,
+  `Date: ${booking.acceptedAlternateDate || booking.answers?.weddingDate || booking.answers?.eventDate || "Not recorded"}`,
+  `Venue: ${booking.hallName || "Not selected"}`,
+  `Guests: ${booking.quotation?.guests || booking.answers?.guests || "Not recorded"}`,
+  `Menu: ${booking.selectedMenuName || "Not recorded"}`,
+  `Total bill: ${moneyPk(booking.quotation?.total)}`,
+  `Advance due/received: ${moneyPk(booking.quotation?.advanceRequired)}`,
+  `Booking ID: ${booking._id}`,
+  "",
+  "Customer details are saved in the matching Wedding/Corporate bookings section. Open the booking record to review the proof and verify or reject it with a reason.",
+].join("\n");
+const csDeclineCaption = (booking, reason) => [
+  "*Advance payment not agreed*",
+  "",
+  `Customer: ${booking.customerName || "Customer"}`,
+  `WhatsApp: +${digitsOnly(booking.customerPhone)}`,
+  `Category: ${booking.bookingCategory || booking.package || "Booking"}`,
+  `Package: ${booking.package || "Not recorded"}`,
+  ...bookingDetailLines(booking).filter((line) => !line.startsWith("Package:")),
+  `Total: ${moneyPk(booking.totalAmount)}`,
+  `Advance asked: ${moneyPk(booking.advanceAmount)}`,
+  `Reason: ${reason || "Customer did not agree to pay the 20% advance."}`,
+  `Booking ID: ${booking._id}`,
+  "",
+  "Details are already saved. Open Customer Details in CRM to handle this customer.",
+].join("\n");
+const requireN8nKey = (req, res) => {
+  if (process.env.N8N_API_KEY && req.get("x-api-key") !== process.env.N8N_API_KEY) {
+    res.status(401).json({ success: false, message: "Invalid API key" });
+    return false;
+  }
+  return true;
+};
+const matchPhone = (stored, phone) => digitsOnly(stored).slice(-10) === digitsOnly(phone).slice(-10) && digitsOnly(phone).length >= 7;
 
 async function confirmAndNotify(req, booking) {
-  if (!["pending", "confirmed"].includes(booking.status)) {
+  if (!["pending", "pending_payment_verification", "confirmed"].includes(booking.status)) {
     return { error: "Only pending bookings, or confirmed bookings with a failed WhatsApp message, can be confirmed." };
   }
   if (!["advance_received", "paid"].includes(booking.paymentStatus)) {
@@ -103,19 +245,7 @@ async function confirmAndNotify(req, booking) {
   const message = bookingConfirmationText(booking);
   let sendError = "";
   try {
-    if (!process.env.WHATSAPP_PHONE_NUMBER_ID || !process.env.WHATSAPP_ACCESS_TOKEN) {
-      throw new Error("WhatsApp Cloud API credentials are not configured.");
-    }
-    await axios.post(
-      `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to: String(booking.customerPhone).replace(/\D/g, ""),
-        type: "text",
-        text: { body: message },
-      },
-      { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`, "Content-Type": "application/json" } }
-    );
+    await sendWhatsAppText(booking.customerPhone, message);
     booking.confirmationMessageStatus = "sent";
     booking.confirmationMessageError = "";
   } catch (error) {
@@ -187,6 +317,11 @@ async function checkBookingCapacity(data, restaurantId) {
       excludeBookingId: data._id,
     });
   }
+  if (category === "Corporate" && (!data.bookingDate || !data.bookingTime)) {
+    const error = new Error("Corporate bookings require a valid event date and time.");
+    error.status = 400;
+    throw error;
+  }
   if (!category || !data.bookingDate || !data.bookingTime) return null;
   const date = new Date(data.bookingDate);
   if (Number.isNaN(date.getTime())) {
@@ -205,6 +340,7 @@ async function checkBookingCapacity(data, restaurantId) {
     error.status = 400;
     throw error;
   }
+  if (category === "Corporate") return null;
   return checkAvailability({
     restaurantId,
     date: date.toISOString().slice(0, 10),
@@ -342,7 +478,9 @@ exports.createBooking = async (req, res) => {
     }
     const booking = await Booking.create({
       ...bookingData,
-      restaurantId: restaurantId
+      restaurantId,
+      handledBy: "cs_manual",
+      bookingSource: bookingData.bookingSource || "in-person",
     });
 
     emitBooking(req, "new_booking", booking);
@@ -406,8 +544,6 @@ exports.createBookingFromWhatsApp = async (req, res) => {
     if (process.env.N8N_API_KEY && req.get("x-api-key") !== process.env.N8N_API_KEY) {
       return res.status(401).json({ success: false, message: "Invalid API key" });
     }
-    console.log("📅 BOOKING REQUEST FROM n8n:", req.body);
-
     const { bookingData, fromNumber, restaurantId = "restaurant-1" } = req.body;
 
     if (!bookingData || !fromNumber) {
@@ -457,6 +593,8 @@ exports.createBookingFromWhatsApp = async (req, res) => {
       customerName: parsed.customerName || "WhatsApp Customer",
       customerPhone: fromNumber,
       customerEmail: parsed.customerEmail || "",
+      handledBy: "whatsapp-bot",
+      customerLanguage: parsed.customerLanguage || detectLanguage(parsed.notes || parsed.specialRequests || ""),
       package: parsed.package || "",
       bookingCategory: String(
         parsed.bookingCategory === "Wedding" ? "Wedding Package"
@@ -524,9 +662,9 @@ exports.createBookingFromWhatsApp = async (req, res) => {
         availability,
       });
     }
-    if (isRoomBooking) {
-      const checkIn = roomDateObject(payload.bookingDate.slice(0, 10));
-      const checkOut = roomDateObject(payload.checkOutDate.slice(0, 10));
+    if (roomBooking && availability?.roomType) {
+      const checkIn = roomDateObject(String(payload.bookingDate).slice(0, 10));
+      const checkOut = roomDateObject(String(payload.checkOutDate).slice(0, 10));
       const nights = (checkOut - checkIn) / 86400000;
       payload.roomType = availability.roomType.name;
       payload.totalAmount = Math.round(availability.roomType.baseRate * payload.numberOfRooms * nights * 100) / 100;
@@ -565,8 +703,8 @@ exports.updateBookingStatus = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) return res.status(400).json({ success: false, message: "Invalid booking id" });
-    const { status } = req.body;
-    const statuses = ["pending", "confirmed", "checked_in", "completed", "cancelled", "no_show"];
+    const { status, remarks = "" } = req.body;
+    const statuses = ["pending", "pending_payment_verification", "confirmed", "checked_in", "completed", "cancelled", "no_show"];
     if (!statuses.includes(status)) return res.status(400).json({ success: false, message: `status must be one of: ${statuses.join(", ")}` });
 
     console.log(`\n📅 updateBookingStatus:`);
@@ -575,6 +713,9 @@ exports.updateBookingStatus = async (req, res) => {
 
     const booking = await Booking.findOne({ _id: id, restaurantId: req.admin.restaurantId });
     if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
+    if (status === "cancelled" && booking.paymentScreenshotUrl && !String(remarks).trim()) {
+      return res.status(400).json({ success: false, message: "Add a reason when rejecting a submitted payment proof." });
+    }
     if (status === "confirmed") {
       const result = await confirmAndNotify(req, booking);
       if (result.error) return res.status(409).json({ success: false, message: result.error, data: booking });
@@ -582,6 +723,11 @@ exports.updateBookingStatus = async (req, res) => {
     }
     const previousStatus = booking.status;
     booking.status = status;
+    if (String(remarks || "").trim()) booking.csRemarks = String(remarks).trim().slice(0, 1000);
+    if (status === "cancelled" && ["verifying", "proof_received", "unpaid", "payment_declined"].includes(booking.paymentStatus)) {
+      booking.paymentStatus = "rejected";
+      booking.paymentDeclineReason = String(remarks || "Payment proof rejected by CS.").trim().slice(0, 500);
+    }
     await booking.save();
 
     if (!booking) {
@@ -652,7 +798,8 @@ exports.updateBooking = async (req, res) => {
       "checkOutDate",
       "numberOfRooms",
       "specialRequests",
-      "notes", "totalAmount", "advanceAmount", "paymentMethod", "offerApplied",
+      "notes", "csRemarks", "totalAmount", "advanceAmount", "paymentMethod", "offerApplied",
+      "bookingCategory", "selectedItems", "bookingDetails", "handledBy", "paymentStatus",
     ];
 
     const updateData = {};
@@ -730,7 +877,7 @@ exports.capturePaymentScreenshot = async (req, res) => {
       booking = await Booking.findOne({ _id: req.params.id, restaurantId });
     } else if (paymentProofType) {
       const [candidates, weddingCandidates, corporateCandidates] = await Promise.all([
-        Booking.find({ restaurantId, status: "pending" }).sort({ createdAt: -1 }).limit(100),
+        Booking.find({ restaurantId, status: { $in: ["pending", "pending_payment_verification"] } }).sort({ createdAt: -1 }).limit(100),
         WeddingBooking.find({ restaurantId, bookingType: "wedding", paymentVerified: false, stage: { $in: ["proposal", "advance_payment", "agreement", "cs_verification"] } }).sort({ createdAt: -1 }).limit(100),
         WeddingBooking.find({ restaurantId, bookingType: "corporate", paymentVerified: false, stage: { $in: ["proposal", "advance_payment", "agreement", "cs_verification"] } }).sort({ createdAt: -1 }).limit(100),
       ]);
@@ -743,7 +890,7 @@ exports.capturePaymentScreenshot = async (req, res) => {
       corporateBooking = matches[0] instanceof WeddingBooking && matches[0].bookingType === "corporate" ? matches[0] : null;
     }
     if (paymentProofType && req.params.id && !booking) return res.status(404).json({ success: false, message: "Booking not found" });
-    if (booking && booking.status !== "pending") return res.status(409).json({ success: false, message: "Payment screenshot can only be attached to a pending booking" });
+    if (booking && !["pending", "pending_payment_verification"].includes(booking.status)) return res.status(409).json({ success: false, message: "Payment screenshot can only be attached to a pending booking" });
     if (weddingBooking?.paymentVerified) return res.status(409).json({ success: false, message: "This wedding advance has already been verified." });
     if (corporateBooking?.paymentVerified) return res.status(409).json({ success: false, message: "This corporate advance has already been verified." });
     const attachedBooking = booking || weddingBooking || corporateBooking;
@@ -802,17 +949,39 @@ exports.capturePaymentScreenshot = async (req, res) => {
 
     if (booking) {
       booking.paymentScreenshotUrl = screenshotUrl;
-      booking.paymentStatus = "verifying";
+      booking.paymentStatus = "proof_received";
+      booking.status = "pending_payment_verification";
+      booking.paymentProofConfirmedByCustomer = false;
+      if (caption) booking.customerLanguage = detectLanguage(caption, booking.customerLanguage);
       await booking.save();
     } else if (weddingBooking) {
       weddingBooking.paymentProofUrl = screenshotUrl;
+      weddingBooking.paymentProofConfirmedByCustomer = false;
       weddingBooking.paymentStatus = "proof_received";
       weddingBooking.paymentVerified = false;
+      weddingBooking.awaitingAdvancePayment = false;
+      if (weddingBooking.stage !== "cs_verification") {
+        weddingBooking.stage = "cs_verification";
+        weddingBooking.stageHistory.push({
+          stage: "cs_verification",
+          actorName: "WhatsApp AI",
+          note: "Customer payment proof received; awaiting customer confirmation and CS verification.",
+        });
+      }
       await weddingBooking.save();
     } else if (corporateBooking) {
       corporateBooking.paymentProofUrl = screenshotUrl;
+      corporateBooking.paymentProofConfirmedByCustomer = false;
       corporateBooking.paymentStatus = "proof_received";
       corporateBooking.paymentVerified = false;
+      if (corporateBooking.stage !== "cs_verification") {
+        corporateBooking.stage = "cs_verification";
+        corporateBooking.stageHistory.push({
+          stage: "cs_verification",
+          actorName: "WhatsApp AI",
+          note: "Customer payment proof received; awaiting customer confirmation and CS verification.",
+        });
+      }
       await corporateBooking.save();
     }
     await Chat.create({
@@ -854,37 +1023,23 @@ exports.capturePaymentScreenshot = async (req, res) => {
       const io = req.app.get("io");
       if (io) io.to("chat-admins").emit("corporate_booking_updated", { bookingId: corporateBooking._id, restaurantId, booking: corporateBooking });
     }
-    let warning = "";
-    if (process.env.WHATSAPP_CS_TEAM_NUMBER) {
-      try {
-        if (!process.env.WHATSAPP_PHONE_NUMBER_ID || !process.env.WHATSAPP_ACCESS_TOKEN) {
-          throw new Error("WhatsApp Cloud API credentials are not configured.");
-        }
-        await axios.post(
-          `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
-          {
-            messaging_product: "whatsapp",
-            to: process.env.WHATSAPP_CS_TEAM_NUMBER.replace(/\D/g, ""),
-            type: mediaType,
-            [mediaType]: {
-              link: screenshotUrl,
-              ...(mediaType === "document" && mediaFilename ? { filename: mediaFilename } : {}),
-              ...(["image", "video", "document"].includes(mediaType) ? { caption: attachedBooking
-                ? `Payment proof received: ${attachedBooking.customerName} · ${corporateBooking ? "Corporate event" : weddingBooking ? attachedBooking.selectedMenuName || "Wedding booking" : attachedBooking.package} · booking ${attachedBooking._id}`
-                : `Customer ${mediaType} received from +${phone}.` } : {}),
-            },
-          },
-          { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`, "Content-Type": "application/json" } }
-        );
-      } catch (error) {
-        warning = `Proof was saved in CRM, but the CS WhatsApp notification failed: ${error.response?.data?.error?.message || error.message}`;
-        console.error(warning);
-      }
-    } else {
-      warning = "Image was saved in CRM. Configure WHATSAPP_CS_TEAM_NUMBER to forward it to the CS team.";
-      console.warn(warning);
-    }
-    res.json({ success: true, attachedToBooking: Boolean(attachedBooking), bookingType: corporateBooking ? "corporate" : weddingBooking ? "wedding" : booking ? "standard" : null, data: attachedBooking || null, screenshotUrl, ...(warning ? { warning } : {}) });
+    const language = detectLanguage(caption, attachedBooking?.customerLanguage || "en");
+    const customerReply = attachedBooking
+      ? proofConfirmQuestion(language)
+      : language === "ur"
+        ? "آپ کی فائل موصول ہو گئی ہے اور ٹیم کے لیے محفوظ کر لی گئی ہے۔"
+        : language === "roman"
+          ? "Aapki file mil gayi hai aur team ke liye save kar di gayi hai."
+          : "We received your file and saved it for our team to review.";
+    res.json({
+      success: true,
+      attachedToBooking: Boolean(attachedBooking),
+      needsCustomerConfirmation: Boolean(attachedBooking),
+      customerReply,
+      bookingType: corporateBooking ? "corporate" : weddingBooking ? "wedding" : booking ? "standard" : null,
+      data: attachedBooking || null,
+      screenshotUrl,
+    });
   } catch (error) {
     console.error("capturePaymentScreenshot error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -900,7 +1055,10 @@ exports.verifyPayment = async (req, res) => {
     if (paymentMethod !== undefined && typeof paymentMethod !== "string") return res.status(400).json({ success: false, message: "paymentMethod must be a string" });
     const booking = await Booking.findOne({ _id: req.params.id, restaurantId: req.admin.restaurantId });
     if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
-    if (booking.status !== "pending" || booking.paymentStatus !== "verifying" || !booking.paymentScreenshotUrl) {
+    if (booking.handledBy === "whatsapp-bot" && !booking.paymentProofConfirmedByCustomer) {
+      return res.status(409).json({ success: false, message: "Wait for the customer to confirm the submitted payment proof before verification." });
+    }
+    if (!["pending", "pending_payment_verification"].includes(booking.status) || !["verifying", "proof_received"].includes(booking.paymentStatus) || !booking.paymentScreenshotUrl) {
       return res.status(409).json({ success: false, message: "A pending booking with a submitted payment proof is required before payment can be verified." });
     }
     booking.paymentStatus = "advance_received";
@@ -909,8 +1067,17 @@ exports.verifyPayment = async (req, res) => {
     booking.paymentVerifiedBy = req.admin._id;
     booking.paymentVerifiedAt = new Date();
     await booking.save();
-    emitBooking(req, "booking_updated", booking);
-    res.json({ success: true, data: booking, message: "Advance payment verified. Confirm the booking separately when ready." });
+    const result = await confirmAndNotify(req, booking);
+    if (result.error) {
+      emitBooking(req, "booking_updated", booking);
+      return res.json({ success: true, data: booking, warning: `Payment verified, but confirmation could not be sent: ${result.error}` });
+    }
+    res.json({
+      success: true,
+      data: result.booking,
+      message: "Payment verified. Booking confirmed and WhatsApp confirmation sent to the customer.",
+      ...(result.warning ? { warning: result.warning } : {}),
+    });
   } catch (error) {
     console.error("verifyPayment error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -930,6 +1097,208 @@ exports.checkInBooking = async (req, res) => {
     res.json({ success: true, data: booking, loyalty });
   } catch (error) {
     console.error("checkInBooking error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const findLatestForPhone = async (restaurantId, phone, extra = {}) => {
+  const candidates = await Booking.find({ restaurantId, ...extra }).sort({ createdAt: -1 }).limit(150);
+  return candidates.find((candidate) => matchPhone(candidate.customerPhone, phone)) || null;
+};
+
+exports.confirmPaymentProof = async (req, res) => {
+  try {
+    if (!requireN8nKey(req, res)) return;
+    const restaurantId = String(req.body.restaurantId || "restaurant-1").trim();
+    const phone = digitsOnly(req.body.customerPhone || req.body.fromNumber);
+    const language = detectLanguage(req.body.message, req.body.customerLanguage || "en");
+    if (phone.length < 7) return res.status(400).json({ success: false, message: "A valid customerPhone is required" });
+    const [standard, events] = await Promise.all([
+      Booking.find({ restaurantId, status: { $in: ["pending", "pending_payment_verification"] }, paymentStatus: { $in: ["proof_received", "verifying"] } }).sort({ createdAt: -1 }).limit(100),
+      WeddingBooking.find({ restaurantId, bookingType: { $in: ["wedding", "corporate"] }, paymentVerified: false, paymentStatus: "proof_received", stage: "cs_verification" }).sort({ createdAt: -1 }).limit(100),
+    ]);
+    const matches = [
+      ...standard.filter((item) => matchPhone(item.customerPhone, phone)).map((item) => ({ booking: item, type: "standard" })),
+      ...events.filter((item) => matchPhone(item.customerPhone, phone)).map((item) => ({ booking: item, type: item.bookingType })),
+    ].sort((a, b) => b.booking.createdAt - a.booking.createdAt);
+    const match = matches[0];
+    if (!match) return res.json({ success: true, data: { active: false, replyText: "" } });
+    const booking = match.booking;
+    const text = String(req.body.message || "").trim();
+    const affirmative = /^(yes|yeah|yep|haan|han|ji|confirm|confirmed|bilkul|theek hai|sahi hai|ہاں|جی|تصدیق ہے|بالکل)[.!،۔\s]*$/i.test(text);
+    const negative = /^(no|nope|nahi|nahin|nahi hai|galat|wrong|not mine|نہیں|غلط)[.!،۔\s]*$/i.test(text);
+    if (!affirmative && !negative) return res.json({ success: true, data: { active: false, replyText: "" } });
+    if (negative) {
+      booking.paymentProofConfirmedByCustomer = false;
+      booking.customerLanguage = language;
+      await booking.save();
+      const replyText = language === "ur"
+        ? "ٹھیک ہے، براہِ کرم درست ادائیگی کی رسید یا اسکرین شاٹ بھیج دیں۔ موجودہ بکنگ ادائیگی کی تصدیق تک زیرِ التوا رہے گی۔"
+        : language === "roman"
+          ? "Theek hai, meherbani karke sahi payment receipt ya screenshot bhej dein. Booking payment verify hone tak pending rahegi."
+          : "Understood. Please send the correct payment receipt or screenshot. The booking will remain pending until payment is verified.";
+      return res.json({ success: true, data: { active: true, replyText, bookingType: match.type } });
+    }
+    if (match.type === "standard") {
+      booking.status = "pending_payment_verification";
+      booking.paymentStatus = "verifying";
+    }
+    booking.paymentProofConfirmedByCustomer = true;
+    booking.customerLanguage = language;
+    await booking.save();
+    if (match.type === "standard") emitBooking(req, "booking_updated", booking);
+    else if (match.type === "wedding") req.app.get("io")?.to("chat-admins").emit("wedding_booking_updated", { bookingId: booking._id, restaurantId, booking });
+    else req.app.get("io")?.to("chat-admins").emit("corporate_booking_updated", { bookingId: booking._id, restaurantId, booking });
+    let warning = "";
+    try {
+      warning = await notifyCsTeam({
+        caption: match.type === "standard" ? csPaymentCaption(booking) : eventPaymentCaption(booking, match.type),
+        mediaUrl: match.type === "standard" ? booking.paymentScreenshotUrl : booking.paymentProofUrl,
+        mediaType: "image",
+      });
+    } catch (error) {
+      warning = `Proof was saved, but the CS WhatsApp notification failed: ${error.response?.data?.error?.message || error.message}`;
+      console.error(warning);
+    }
+    const customerReply = warning ? customerCsNotifyFailureText(language) : customerWaitText(language);
+    res.json({ success: true, data: { active: true, booking, replyText: customerReply, bookingType: match.type }, ...(warning ? { warning } : {}) });
+  } catch (error) {
+    console.error("confirmPaymentProof error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.declineAdvancePayment = async (req, res) => {
+  try {
+    if (!requireN8nKey(req, res)) return;
+    const restaurantId = String(req.body.restaurantId || "restaurant-1").trim();
+    const phone = digitsOnly(req.body.customerPhone || req.body.fromNumber);
+    const reason = String(req.body.reason || req.body.message || "Customer did not agree to pay the 20% advance.").trim().slice(0, 500);
+    const language = detectLanguage(req.body.message, req.body.customerLanguage || "en");
+    if (phone.length < 7) return res.status(400).json({ success: false, message: "A valid customerPhone is required" });
+    const message = String(req.body.message || "").trim();
+    const explicitPaymentDecline = /\b(?:can't|cannot|cant|won't|will not|unable to|not able to)\s+(?:pay|make payment|send (?:the )?payment|afford)\b|\b(?:payment|advance)\s+(?:is\s+)?(?:not|no)\b|\b(?:payment|advance)\s+nahi\b|payment nahi karna|advance nahi karna/i.test(message)
+      || /ادائیگی نہیں|ایڈوانس نہیں|پیسے نہیں دے سکتا|پیسے نہیں دے سکتی/.test(message);
+    const generalRefusal = /\b(no|nope|not now|later|not interested|don't want|do not want|too expensive|cash|problem|issue|help|human|agent|can't|cannot|unable)\b/i.test(message)
+      || /\b(nahi|nahin|nhi|abhi nahi|baad mein|masla|mushkil|mehnga|madad|insan|insaan|banday se|baat karni)\b/i.test(message)
+      || /نہیں|ابھی نہیں|بعد میں|مسئلہ|مہنگا|مدد|انسان/.test(message);
+    const phoneTail = phone.slice(-7);
+    const phonePattern = new RegExp(phoneTail.split("").join("[^0-9]*") + "$");
+    const lastBotMessage = await Chat.findOne({
+      restaurantId,
+      customerPhone: { $regex: phonePattern },
+      botReply: { $ne: "" },
+    }).sort({ createdAt: -1 }).select("botReply createdAt").lean();
+    const recentPaymentRequest = lastBotMessage
+      && Date.now() - new Date(lastBotMessage.createdAt).getTime() <= 7 * 24 * 60 * 60 * 1000
+      && /\b(20\s*%|advance|payment|pay|account|transfer|deposit)\b|ادائیگی|ایڈوانس|پیسے|رقم/i.test(lastBotMessage.botReply);
+    const declined = explicitPaymentDecline || (generalRefusal && recentPaymentRequest);
+    if (!declined) return res.json({ success: true, data: { active: false, replyText: "" } });
+    const booking = await findLatestForPhone(restaurantId, phone, {
+      status: "pending",
+      paymentStatus: { $in: ["unpaid", "payment_declined"] },
+    });
+    if (!booking) return res.json({ success: true, data: { active: false, replyText: "" } });
+    booking.paymentStatus = "payment_declined";
+    booking.paymentDeclineReason = reason;
+    booking.customerLanguage = language;
+    await booking.save();
+    emitBooking(req, "booking_updated", booking);
+    let warning = "";
+    try {
+      warning = await notifyCsTeam({ caption: csDeclineCaption(booking, reason) });
+    } catch (error) {
+      warning = `Saved in CRM, but the CS WhatsApp notification failed: ${error.response?.data?.error?.message || error.message}`;
+      console.error(warning);
+    }
+    const customerReply = warning
+      ? customerCsNotifyFailureText(language)
+      : language === "ur"
+        ? "سمجھ گیا۔ آپ کی تفصیلات محفوظ ہیں۔ ہماری ٹیم جلد آپ سے رابطہ کرے گی۔"
+        : language === "roman"
+          ? "Samajh gaya. Aapki details save hain. Hamari team jald aapse rabta karegi."
+          : "Understood. Your details are saved. Our team will contact you shortly.";
+    res.json({ success: true, data: { active: true, booking, replyText: customerReply }, ...(warning ? { warning } : {}) });
+  } catch (error) {
+    console.error("declineAdvancePayment error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getCustomerBookingContext = async (req, res) => {
+  try {
+    if (!requireN8nKey(req, res)) return;
+    const restaurantId = String(req.query.restaurantId || "restaurant-1").trim();
+    const phone = digitsOnly(req.query.phone || req.query.customerPhone);
+    if (phone.length < 7) return res.status(400).json({ success: false, message: "A valid phone is required" });
+    const phoneTail = phone.slice(-7);
+    const phonePattern = new RegExp(phoneTail.split("").join("[^0-9]*") + "$");
+    const [standard, events] = await Promise.all([
+      Booking.find({ restaurantId, customerPhone: { $regex: phonePattern } }).sort({ createdAt: -1 }).limit(100).lean(),
+      WeddingBooking.find({ restaurantId, customerPhone: { $regex: phonePattern } }).sort({ createdAt: -1 }).limit(100).lean(),
+    ]);
+    const bookings = standard.filter((item) => matchPhone(item.customerPhone, phone)).slice(0, 8).map((item) => ({
+      type: "standard",
+      id: String(item._id),
+      customerName: item.customerName,
+      customerPhone: item.customerPhone,
+      handledBy: item.handledBy || "whatsapp-bot",
+      bookingSource: item.bookingSource,
+      status: item.status,
+      paymentStatus: item.paymentStatus,
+      paymentVerified: ["advance_received", "paid"].includes(item.paymentStatus),
+      category: item.bookingCategory || item.package,
+      package: item.package,
+      selectedItems: item.selectedItems || [],
+      bookingDetails: item.bookingDetails || [],
+      date: item.bookingDate,
+      time: item.bookingTime,
+      guests: item.numberOfPersons,
+      totalAmount: item.totalAmount,
+      advanceAmount: item.advanceAmount,
+      paymentProofOnFile: Boolean(item.paymentScreenshotUrl),
+      csRemarks: item.csRemarks || "",
+      paymentDeclineReason: item.paymentDeclineReason || "",
+      createdAt: item.createdAt,
+    }));
+    const eventBookings = events.filter((item) => matchPhone(item.customerPhone, phone)).slice(0, 8).map((item) => ({
+      type: item.bookingType || "wedding",
+      id: String(item._id),
+      customerName: item.customerName,
+      customerPhone: item.customerPhone,
+      stage: item.stage,
+      paymentStatus: item.paymentStatus,
+      paymentVerified: Boolean(item.paymentVerified),
+      status: item.stage,
+      category: item.bookingType === "corporate" ? "Corporate" : "Wedding Package",
+      package: item.selectedMenuName || item.packageName || "",
+      details: item.answers || {},
+      hallName: item.hallName || "",
+      date: item.acceptedAlternateDate || item.answers?.weddingDate || item.answers?.eventDate || "",
+      guests: item.quotation?.guests || item.answers?.guests || null,
+      totalAmount: item.quotation?.total || 0,
+      advanceAmount: item.quotation?.advanceRequired || 0,
+      paymentProofOnFile: Boolean(item.paymentProofUrl),
+      agreementRequired: true,
+      agreementSaved: Boolean(item.agreementUrl),
+      createdAt: item.createdAt,
+    }));
+    const latest = [...bookings, ...eventBookings].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0];
+    const hasPaymentDecline = bookings.some((item) => item.paymentStatus === "payment_declined" || item.paymentDeclineReason);
+    res.json({
+      success: true,
+      data: {
+        phone,
+        bookings,
+        eventBookings,
+        hasPaymentDecline,
+        instruction: latest
+          ? `This customer already has CRM records. Never say they have not booked, not paid, or must provide booking details again if a matching record shows otherwise. Latest: ${latest.category} · status ${latest.status} · payment ${latest.paymentStatus} · handled by ${latest.handledBy || "CRM team"}.`
+          : "No saved CRM booking for this phone yet.",
+      },
+    });
+  } catch (error) {
+    console.error("getCustomerBookingContext error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

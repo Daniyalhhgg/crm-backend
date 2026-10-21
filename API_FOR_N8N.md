@@ -27,7 +27,7 @@ New standard, wedding, and corporate bookings; booking cancellations; explicit c
 
 The editable workflow export is stored in the [`n8n-workflows`](./n8n-workflows) folder:
 
-- [`restaurant-whatsapp-ai-bot.json`](./n8n-workflows/restaurant-whatsapp-ai-bot.json): the WhatsApp conversation and booking workflow shared for this CRM. This import copy is inactive. Review its CRM base URL, phone number ID, and WhatsApp/Gemini/Mistral/MongoDB credentials, and test menu replies with the media saved for each CRM category before activation. The AI receives live menu data directly from the CRM; category replies send configured images, PDFs, videos, and voice notes from the CRM menu. Before creating a booking, the workflow checks live availability: fixed time windows for food/events, and room type plus check-in/check-out inventory for stays.
+- [`restaurant-whatsapp-ai-bot.json`](./n8n-workflows/restaurant-whatsapp-ai-bot.json): the WhatsApp conversation and booking workflow shared for this CRM. This import copy is inactive. Review its CRM base URL, phone number ID, and WhatsApp/Gemini/Mistral/MongoDB credentials, and test menu replies with the media saved for each CRM category before activation. The AI receives live menu data directly from the CRM; category replies send configured images, PDFs, videos, and voice notes from the CRM menu. Before creating a booking, the workflow checks configured availability for supported categories and room inventory; Corporate requests are saved pending without claiming venue availability.
 - [`N8N_CREDENTIALS.md`](./n8n-workflows/N8N_CREDENTIALS.md): safe checklist of required n8n credential types, environment variables, and post-import settings. It intentionally contains no secret values.
 - [`BACKEND_ENV_SETUP.md`](./BACKEND_ENV_SETUP.md): separate guide to the CRM backend's private environment variables. Backend secrets belong on the backend host, not in n8n credentials.
 
@@ -401,16 +401,26 @@ Success response uses `{ "success": true, "message": "...", "data": <booking> }`
 
 ## Attach a payment screenshot
 
-`POST /api/bookings/payment-screenshot` with JSON body containing `url` (an HTTP(S) URL), `customerPhone`, and optional `restaurantId`. The backend associates it with the newest pending booking for that phone. If the booking ID is already known, use `POST /api/bookings/{bookingId}/payment-screenshot` with `{ "url": "https://..." }` instead.
+`POST /api/bookings/payment-screenshot` accepts either a trusted HTTP(S) `url` or an incoming WhatsApp `mediaId`, plus `customerPhone`, `mediaType`, optional `caption`, and `restaurantId`. The backend links payment images/PDFs to the newest matching pending standard, wedding, or corporate booking and stores the media in CRM. If a booking ID is known, the standard-booking endpoint also accepts `POST /api/bookings/{bookingId}/payment-screenshot`.
 
 ```bash
 curl -X POST "https://YOUR_API_HOST/api/bookings/payment-screenshot" \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_N8N_API_KEY" \
-  -d '{"url":"https://files.example.com/payment.jpg","customerPhone":"923001234567","restaurantId":"restaurant-1"}'
+  -d '{"mediaId":"WHATSAPP_MEDIA_ID","mediaType":"image","caption":"payment receipt","customerPhone":"923001234567","restaurantId":"restaurant-1"}'
 ```
 
-The booking is marked `paymentStatus: "verifying"`; CRM staff must verify the payment before it is confirmed.
+On receipt, the booking proof is saved and the customer receives a localized yes/no confirmation question. It is not yet forwarded to CS or eligible for verification. After the customer confirms, the workflow marks standard payment as `verifying`, forwards the proof and booking details to CS, and replies that verification is pending. CS must verify the payment before a standard booking can be confirmed. Wedding/corporate bookings retain their separate signed-agreement and staff-confirmation requirements.
+
+## WhatsApp booking context and payment follow-up
+
+These n8n-only endpoints require `x-api-key`:
+
+- `GET /api/bookings/customer-context?restaurantId=restaurant-1&phone=923001234567` returns matching standard, wedding, and corporate records for the sender. The AI uses this live CRM context to recognize staff-created bookings and not contradict saved booking/payment status.
+- `POST /api/bookings/confirm-payment-proof` with `{ "restaurantId": "restaurant-1", "customerPhone": "923001234567", "message": "Yes" }` handles the yes/no response to the uploaded-proof question. A confirmed response forwards the proof to CS; a negative response asks for a correct proof. Unrelated messages return `data.active: false` and continue through normal routing.
+- `POST /api/bookings/decline-advance` with `{ "restaurantId": "restaurant-1", "customerPhone": "923001234567", "message": "I cannot pay the advance right now" }` records a customer's decline on the existing pending standard booking, sends the booking details and reason to CS, and returns a localized acknowledgement. It does not create a booking if no pending record exists.
+
+The standard booking is created after the customer confirms the booking request and its required details are collected; a separate promise to pay the advance is not required before saving the pending request. This lets CS see the customer's details if they later decline or need help with the advance. The 20% advance remains unverified until CS checks the submitted proof.
 
 ## Look up loyalty status
 
@@ -468,45 +478,11 @@ All endpoints below accept `x-api-key` when `N8N_API_KEY` is configured. The ten
 
 Date values must be real dates in `YYYY-MM-DD` format. Availability statuses are `available`, `booked`, and `blocked`. A confirmed CRM booking reserves its selected date and hall.
 
-### Sequential wedding enquiry flow
+### Current WhatsApp booking flow
 
-The shared `restaurant-whatsapp-ai-bot.json` workflow sends every text message to the wedding flow endpoint before the regular menu/AI path. Existing in-progress wedding enquiries take priority; a new booking flow starts only when the workflow identifies a wedding-event request.
+The shared WhatsApp workflow handles Wedding Package through the same AI booking action as other standard categories. The bot uses the active wedding package and its configured per-person price, collects the event date/time and guest count, quotes the CRM-based total and 20% advance, then creates a normal pending record through `POST /api/bookings/from-whatsapp`. The shared Wedding availability calendar is checked first. Payment screenshots are attached to that standard booking; CS can verify them from the unified Bookings page or the Wedding Payments page.
 
-`POST /api/weddings/enquiries/flow`
-
-```json
-{
-  "restaurantId": "restaurant-1",
-  "customerPhone": "923001234567",
-  "customerName": "Customer",
-  "message": "I want to arrange a wedding",
-  "isWeddingStart": true
-}
-```
-
-When `isWeddingStart` is false and there is no active wedding enquiry, the response is `{ "success": true, "data": { "active": false, "replyText": "" } }`, and the workflow continues to its normal AI path. For a new wedding request, it creates a WhatsApp-sourced CRM wedding booking and responds with the first question. For each later message, it saves the answer to the current question and responds with the next one. Invalid date or guest-count answers keep the flow on the same question and return a customer-facing correction prompt without advancing.
-
-Successful active-flow response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "active": true,
-    "bookingId": "WEDDING_BOOKING_ID",
-    "complete": false,
-    "questionIndex": 1,
-    "replyText": "What type of event is it: Mehndi, Baraat, Walima, Nikah, Engagement, or another function?",
-    "answers": { "weddingDate": "2026-09-05" }
-  }
-}
-```
-
-After all ten answers, the endpoint checks the requested date against hall capacity and live hall status, suggests alternate dates when necessary, includes configured menu prices and the applicable Grandest offer rules, and saves the enquiry in the CRM pipeline. Each AI question/reply is stored on the booking for CS review. Answers collected are: wedding date, event type, guest count, event start/end time, hall preference, seating, buffet/served dishes, dietary needs, decor, and AV.
-
-The existing `POST /api/bookings/payment-screenshot` endpoint also attaches incoming WhatsApp images to the newest matching wedding enquiry at the proposal/payment/agreement/CS-verification stage. It stores the uploaded proof URL and `proof_received` status on that wedding booking, adds the received media to chat history, and forwards the proof to `WHATSAPP_CS_TEAM_NUMBER` when configured. CS still has to verify the proof from the Wedding bookings page before confirmation.
-
-`POST /api/weddings/enquiries/start` and `POST /api/weddings/enquiries/answer` remain available for integrations that manage question sequencing themselves. The answer endpoint requires `customerPhone`, the current `questionIndex` (0–9), and a non-empty `answer`; out-of-order answers return `409`.
+The legacy `/api/weddings/enquiries/*` endpoints below remain available for existing records or integrations that explicitly use the former question-by-question enquiry workflow. The current WhatsApp workflow no longer calls them, and new standard bookings do not reserve a wedding hall or require the legacy quotation/agreement pipeline.
 
 ### CRM wedding pipeline endpoints
 
@@ -541,23 +517,11 @@ Corporate events have their own CRM menu, enquiry flow, pipeline, and calendars.
 
 Corporate venue rates and boardroom capacities were not supplied, so they are intentionally blank until staff enters verified values in the Corporate Halls or Board Rooms CRM page. A venue with unknown capacity/rate is not represented as guest-capacity eligible, and quotation/confirmation is blocked until the actual values are configured. The Corporate menu is seeded at Rs. 2,850 per person + tax; the corporate tax percentage is intentionally unset until staff enters the approved rate.
 
-### Sequential WhatsApp enquiry flow
+### Current WhatsApp booking flow
 
-The shared WhatsApp workflow checks corporate enquiries before wedding enquiries and normal AI handling. It calls the corporate endpoint for each incoming message so a customer already in an active corporate intake can continue without repeating a trigger word. A new enquiry starts when `isCorporateStart` is true (the workflow detects corporate, conference, seminar, business meeting, company event, or office event).
+The shared WhatsApp workflow handles Corporate through the same AI booking action as other standard categories. The bot uses the active CRM Corporate package/menu and its configured price basis, collects the event date/time and guest count, quotes the CRM-based total and 20% advance, then creates a normal pending record through `POST /api/bookings/from-whatsapp`. Because Corporate uses a separate venue calendar rather than the generic time-slot calendar, the workflow does not claim venue availability; the request remains pending. Payment screenshots are attached to that standard booking; CS can verify them from the unified Bookings page or the Corporate Payments page.
 
-`POST /api/corporate/enquiries/flow`
-
-```json
-{
-  "restaurantId": "restaurant-1",
-  "customerPhone": "923001234567",
-  "customerName": "Customer",
-  "message": "We need a corporate conference",
-  "isCorporateStart": true
-}
-```
-
-The flow asks one question at a time and stores every prompt and reply—including correction prompts—in the booking's AI replies for CS review. It collects event date, purpose, guest count, venue/setup, event timing, menu preference, AV, seating, company, contact person, and special requirements. On completion, it checks live shared availability, capacity, and setup, returns suitable options or alternate dates, and provides the configured menu price. If no corporate enquiry is active and `isCorporateStart` is false, it returns `data.active: false` so n8n proceeds to the wedding/regular conversation route.
+The legacy `/api/corporate/enquiries/*` endpoints remain available for existing records or integrations that explicitly use the former question-by-question enquiry workflow. The current WhatsApp workflow no longer calls them, and new standard bookings do not require the legacy quotation/agreement pipeline.
 
 ### Corporate CRM endpoints
 
@@ -571,4 +535,4 @@ These require CRM admin authentication except where stated:
 - `PATCH /api/corporate/bookings/:id/ai-replies/:replyId` — mark a saved AI reply reviewed.
 - `GET /api/corporate/venues`, `PUT /api/corporate/venues/:hallId`, `PUT /api/corporate/availability` — authenticated CRM venue management and per-date status editing.
 
-Incoming payment screenshots are attached to matching corporate bookings by the existing `POST /api/bookings/payment-screenshot` integration, alongside wedding and standard bookings. A failed WhatsApp send is surfaced as a warning and can be retried by CS from Chat History in Agent mode.
+Incoming payment screenshots are attached to matching corporate bookings by the existing `POST /api/bookings/payment-screenshot` integration, alongside wedding and standard bookings. The customer confirms the upload before the workflow forwards it to CS; payment verification and final event confirmation remain separate staff actions. A failed WhatsApp send is surfaced as a warning and can be retried by CS from Chat History in Agent mode.

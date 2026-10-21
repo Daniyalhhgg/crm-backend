@@ -5,7 +5,7 @@ const { getFixedTimeSlots } = require("./fixedTimeSlots");
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
-const ACTIVE_BOOKING_STATUSES = ["pending", "confirmed", "checked_in"];
+const ACTIVE_BOOKING_STATUSES = ["pending", "pending_payment_verification", "confirmed", "checked_in"];
 const menuCategoryForSlot = (category) => category === "Wedding" ? "Wedding Package" : category;
 
 const dateObject = (date) => {

@@ -1,7 +1,8 @@
 const Setting = require("../models/Setting");
 const defaultPrompt = require("../config/defaultAgentPrompt.json").prompt;
-const REMINDER_PROMPT_MARKER = "\n\nAUTOMATIC FOLLOW-UP REMINDERS — STRICT";
-const reminderPromptRules = defaultPrompt.slice(defaultPrompt.lastIndexOf(REMINDER_PROMPT_MARKER));
+const REMINDER_PROMPT_START = "\n\nAUTOMATIC FOLLOW-UP REMINDERS";
+const reminderStart = defaultPrompt.lastIndexOf(REMINDER_PROMPT_START);
+const reminderPromptRules = reminderStart >= 0 ? defaultPrompt.slice(reminderStart) : "";
 const followUpDelayLabel = (minutes) => {
   if (minutes % 1440 === 0) return `${minutes / 1440} day${minutes === 1440 ? "" : "s"}`;
   if (minutes % 60 === 0) return `${minutes / 60} hour${minutes === 60 ? "" : "s"}`;
@@ -9,7 +10,9 @@ const followUpDelayLabel = (minutes) => {
 };
 
 const activePrompt = (content) => {
-  const base = String(content || "").split(REMINDER_PROMPT_MARKER)[0].trimEnd();
+  const text = String(content || "");
+  const markerIndex = text.lastIndexOf(REMINDER_PROMPT_START);
+  const base = (markerIndex >= 0 ? text.slice(0, markerIndex) : text).trimEnd();
   return `${base}${reminderPromptRules}`;
 };
 

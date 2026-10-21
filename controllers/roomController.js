@@ -115,7 +115,7 @@ exports.getMonthAvailability = async (req, res) => {
       RoomInventory.find({ restaurantId, date: { $gte: start, $lt: end } }).lean(),
       Booking.find({
         restaurantId,
-        status: { $in: ["pending", "confirmed", "checked_in"] },
+        status: { $in: ["pending", "pending_payment_verification", "confirmed", "checked_in"] },
         bookingDate: { $lt: end },
         $or: [{ checkOutDate: { $gt: start } }, { checkOutDate: null }],
       }).select("package roomTypeId numberOfRooms bookingDate checkOutDate").lean(),
