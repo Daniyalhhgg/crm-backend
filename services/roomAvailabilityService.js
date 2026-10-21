@@ -4,7 +4,7 @@ const RoomInventory = require("../models/RoomInventory");
 const RoomType = require("../models/RoomType");
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const ACTIVE_STATUSES = ["pending", "confirmed", "checked_in"];
+const ACTIVE_STATUSES = ["pending", "pending_payment_verification", "confirmed", "checked_in"];
 const dateObject = (value) => {
   if (typeof value !== "string" || !DATE_RE.test(value)) return null;
   const date = new Date(`${value}T00:00:00.000Z`);

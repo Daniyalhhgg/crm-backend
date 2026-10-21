@@ -381,13 +381,24 @@ exports.updateStage = async (req, res) => {
     const booking = await WeddingBooking.findOne({ _id: req.params.id, restaurantId: req.admin.restaurantId, bookingType: "corporate" });
     if (!booking) return res.status(404).json({ success: false, message: "Corporate booking not found." });
     const previousStage = booking.stage;
-    const { stage: next, note } = req.body;
+    let { stage: next, note } = req.body;
     if (!STAGES.some(([id]) => id === next) || next === "confirmed") return res.status(400).json({ success: false, message: "Use a valid corporate workflow stage." });
+    const rejectingPaymentProof = req.body.paymentProofRejection === true;
+    if (rejectingPaymentProof) {
+      note = String(note || "").trim();
+      if (!booking.paymentProofUrl || booking.paymentVerified) return res.status(409).json({ success: false, message: "An unverified payment proof is required before rejection." });
+      if (!note) return res.status(400).json({ success: false, message: "A reason is required to reject payment proof." });
+      booking.paymentStatus = "rejected";
+      booking.paymentProofRejectionReason = note.slice(0, 500);
+      booking.paymentProofConfirmedByCustomer = false;
+      next = "no_booking";
+      note = `Payment proof rejected: ${note.slice(0, 450)}`;
+    }
     if (next === "no_booking" && booking.stage === "confirmed") await releaseVenue(booking);
     if (next === "interested" && req.body.interested === false) stage(booking, "follow_up", req.admin, note || "Client requested follow up later.");
     else stage(booking, next, req.admin, note || "");
     await booking.save();
-    if (booking.stage === "no_booking" && previousStage !== "no_booking") void notifyCustomerDeclined(req, booking);
+    if (booking.stage === "no_booking" && previousStage !== "no_booking" && !rejectingPaymentProof) void notifyCustomerDeclined(req, booking);
     res.json({ success: true, data: await populated(WeddingBooking.findById(booking._id)) });
   } catch (error) {
     console.error("updateCorporateStage error:", error);
@@ -443,6 +454,7 @@ exports.verifyPayment = async (req, res) => {
     const booking = await WeddingBooking.findOne({ _id: req.params.id, restaurantId: req.admin.restaurantId, bookingType: "corporate" });
     if (!booking) return res.status(404).json({ success: false, message: "Corporate booking not found." });
     if (!booking.paymentProofUrl) return res.status(409).json({ success: false, message: "Add the customer's advance payment proof before verification." });
+    if (booking.paymentProofConfirmedByCustomer === false) return res.status(409).json({ success: false, message: "Wait for the customer to confirm the submitted payment proof before verification." });
     booking.paymentVerified = true;
     booking.paymentStatus = "verified";
     booking.paymentVerifiedAt = new Date();

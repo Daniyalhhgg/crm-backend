@@ -37,6 +37,73 @@ const dayDate = (value) => {
   return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? null : date;
 };
 const dateKey = (value) => new Date(value).toISOString().slice(0, 10);
+const customerLanguage = (message, fallback = "en") => {
+  const text = String(message || "");
+  if ([...text].some((character) => {
+    const code = character.codePointAt(0);
+    return code >= 1536 && code <= 1791;
+  })) return "ur";
+  if (/\b(hai|hain|kya|kar|karo|chahiye|mujhe|aap|apko|aapki|aapka|mein|main|nahi|bhi|ka|ki|ke|ko|se|mera|meri|bata|bhej|karein|raha|rahi|haan|han|ji|theek)\b/i.test(text)) return "roman";
+  return fallback;
+};
+const localizedQuestion = (index, language) => {
+  const prompts = {
+    en: [
+      "What is your preferred wedding date? Please use YYYY-MM-DD.",
+      "What type of event is it: Mehndi, Baraat, Walima, Nikah, Engagement, or another function?",
+      "Approximately how many guests will attend?",
+      "What time should the event start and end?",
+      "Would you prefer an indoor hall, an outdoor setup, or either?",
+      "What seating setup do you prefer?",
+      "Would you like buffet or served dining, and do you have any specific dishes in mind?",
+      "Do you have any food preferences or dietary requirements?",
+      "What stage and decor style do you prefer, such as floral or themed decor?",
+      "Do you need sound, microphones, a projector, or an LED screen?",
+    ],
+    roman: [
+      "Aapki wedding ki preferred date kya hai? Date YYYY-MM-DD format mein bhej dein.",
+      "Event kaunsa hai: Mehndi, Baraat, Walima, Nikah, Engagement, ya koi aur function?",
+      "Taqreeban kitne guests honge?",
+      "Event kis waqt shuru aur khatam hoga?",
+      "Aap indoor hall, outdoor setup, ya dono mein se koi bhi prefer karte hain?",
+      "Aapko seating kaunsa setup chahiye?",
+      "Buffet chahiye ya served dining? Koi khaas dishes bhi chahiye?",
+      "Koi food preference ya dietary requirement hai?",
+      "Stage aur decor kaisa pasand hai, jaise floral ya themed?",
+      "Sound, microphones, projector, ya LED screen chahiye?",
+    ],
+    ur: [
+      "آپ کی شادی کی پسندیدہ تاریخ کیا ہے؟ براہِ کرم تاریخ YYYY-MM-DD فارمیٹ میں بھیجیں۔",
+      "تقریب کون سی ہے: مہندی، بارات، ولیمہ، نکاح، منگنی یا کوئی اور فنکشن؟",
+      "تقریباً کتنے مہمان ہوں گے؟",
+      "تقریب کس وقت شروع اور ختم ہوگی؟",
+      "آپ اِن ڈور ہال، آؤٹ ڈور سیٹ اَپ یا دونوں میں سے کوئی بھی پسند کریں گے؟",
+      "آپ کو بیٹھنے کا کون سا انتظام پسند ہے؟",
+      "بوفے چاہیے یا سروڈ ڈائننگ؟ کوئی خاص ڈشز بھی چاہئیں؟",
+      "کھانے کی کوئی پسند یا غذائی ضرورت ہے؟",
+      "اسٹیج اور ڈیکور کیسا پسند ہے، مثلاً پھولوں والا یا تھیم والا؟",
+      "ساؤنڈ، مائیکروفون، پروجیکٹر یا LED اسکرین چاہیے؟",
+    ],
+  };
+  return (prompts[language] || prompts.en)[index] || prompts.en[index];
+};
+const weddingPaymentInstructions = () => {
+  const data = {
+    bankName: process.env.PAYMENT_BANK_NAME || "Meezan Bank",
+    accountTitle: process.env.PAYMENT_ACCOUNT_TITLE || "",
+    accountNumber: process.env.PAYMENT_ACCOUNT_NUMBER || "",
+    iban: process.env.PAYMENT_IBAN || "",
+  };
+  data.configured = Boolean(data.accountTitle && (data.accountNumber || data.iban) && !/configure|placeholder|set_/i.test(`${data.accountTitle} ${data.accountNumber} ${data.iban}`));
+  return data;
+};
+const acceptedQuotation = (message) => /^(yes|yeah|haan|han|ji|theek|agree|agreed|ok|okay|proceed|confirm|kar dein|kar dain|book kar dein|book kar do|ہاں|جی ہاں|ٹھیک ہے|منظور|کر دیں|بک کر دیں)(?:\s+(?:please|bilkul|theek hai|proceed|kar dein|kar dain|book kar dein|book kar do))*[.!،۔\s]*$/i.test(String(message || "").trim());
+const paymentClaim = (message) => /\b(paid|payment\s*(?:kar|kr|has|is|done|sent|transfer)|transfer(?:red)?|bhej\s*(?:di|diya)|jama\s*(?:kar|kr)\s*(?:di|diya))\b/i.test(String(message || "")) || /ادائیگی کر دی|پیسے بھیج دیے|جمع کرا دیے|کر دی ہے/.test(String(message || ""));
+const handoffReply = (language) => ({
+  en: "I’ll connect you with our customer service team to help with your wedding enquiry. Please wait a moment.",
+  roman: "Main aapki wedding enquiry mein madad ke liye customer service team se rabta karwa raha/rahi hoon. Meherbani karke thora intezar karein.",
+  ur: "میں آپ کی ویڈنگ انکوائری میں مدد کے لیے کسٹمر سروس ٹیم سے رابطہ کروا رہا/رہی ہوں۔ براہِ کرم تھوڑا انتظار کریں۔",
+}[language] || "I’ll connect you with our customer service team to help with your wedding enquiry. Please wait a moment.");
 const requireApiKey = (req, res) => {
   if (process.env.N8N_API_KEY && req.get("x-api-key") !== process.env.N8N_API_KEY) {
     res.status(401).json({ success: false, message: "Invalid API key" });
@@ -325,6 +392,134 @@ function addAiReply(booking, questionIndex, text) {
   booking.aiReplies.push({ questionIndex, text });
 }
 
+async function createCustomerWeddingQuotation(booking, restaurantId, hall, selectedMenu) {
+  const menu = await Menu.findOne({ restaurantId, category: "Wedding Package" }).lean();
+  if (!menu) return "The wedding menu is not configured yet.";
+  if (menu.weddingTaxPercent === null || menu.weddingTaxPercent === undefined || menu.weddingTaxPercent === "") {
+    return "The wedding tax rate is not configured yet.";
+  }
+  const taxPercent = Number(menu.weddingTaxPercent);
+  if (!Number.isFinite(taxPercent) || taxPercent < 0 || taxPercent > 100) {
+    return "The configured wedding tax rate is invalid.";
+  }
+  const guests = Number(booking.answers.guests || 0);
+  if (!Number.isInteger(guests) || guests < 1 || guests > hall.capacity) {
+    return "The selected hall cannot accommodate the confirmed guest count.";
+  }
+  const offerActive = Boolean(menu.grandestOffer?.isActive);
+  const rulesApplied = [];
+  let hallRental = Number(hall.rentalPrice || 0);
+  const hallWaiver = menu.grandestOffer?.perks?.find((perk) => /hall rental|no hall rental/i.test(perk.text || ""));
+  const roomPerk = menu.grandestOffer?.perks?.find((perk) => /standard room/i.test(perk.text || ""));
+  const hallThreshold = Number(hallWaiver?.minimumGuests || 75);
+  const roomThreshold = Number(roomPerk?.minimumGuests || 100);
+  if (offerActive && guests >= hallThreshold) {
+    hallRental = 0;
+    rulesApplied.push(`Hall rental waived (${hallThreshold}+ guests)`);
+  }
+  if (offerActive) {
+    rulesApplied.push("Grandest Wedding Offer applied; other perks are subject to their stated availability and terms.");
+    if (guests >= roomThreshold) rulesApplied.push(`Complimentary standard room for the couple (${roomThreshold}+ guests; subject to availability)`);
+  }
+  const menuSubtotal = Math.round(Number(selectedMenu.pricePerPerson) * guests * 100) / 100;
+  if (!Number.isFinite(menuSubtotal) || menuSubtotal <= 0) return "The selected wedding menu does not have a valid price.";
+  const subtotal = menuSubtotal + hallRental;
+  const taxAmount = Math.round(subtotal * taxPercent) / 100;
+  const total = Math.round((subtotal + taxAmount) * 100) / 100;
+  if (!Number.isFinite(total) || total <= 0) return "The configured wedding quotation did not produce a valid total.";
+  booking.hallId = hall.hallId;
+  booking.hallName = hall.hallName;
+  booking.acceptedAlternateDate = hall.date === booking.answers.weddingDate ? "" : hall.date;
+  booking.selectedMenuName = selectedMenu.name;
+  booking.menuPackageId = selectedMenu._id;
+  booking.packageName = offerActive ? menu.grandestOffer.title : "Standard wedding pricing";
+  booking.quotation = {
+    guests,
+    menuPricePerPerson: Number(selectedMenu.pricePerPerson),
+    menuSubtotal,
+    hallRental,
+    decorCost: 0,
+    addOns: [],
+    discount: 0,
+    taxPercent,
+    taxAmount,
+    total,
+    advanceRequired: Math.round(total * 0.2 * 100) / 100,
+    rulesApplied,
+    notes: "Automatic WhatsApp quote includes the selected wedding menu, hall rental, and configured tax. Decor and optional add-ons are excluded unless separately quoted.",
+    generatedAt: new Date(),
+  };
+  booking.awaitingHallChoice = false;
+  booking.awaitingQuotationAgreement = true;
+  booking.awaitingAdvancePayment = false;
+  await changeStage(booking, "proposal", null, "Configured menu, available hall, guest count, and current tax used to prepare an automatic wedding quotation.");
+  return "";
+}
+
+function weddingQuotationMessage(booking, language) {
+  const quotation = booking.quotation;
+  const date = booking.acceptedAlternateDate || booking.answers.weddingDate;
+  const lines = language === "roman"
+    ? [
+      `Wedding quotation - ${booking.answers.eventType || "Wedding"}`,
+      `Date: ${date}`,
+      `Hall: ${booking.hallName}`,
+      `Guests: ${quotation.guests}`,
+      `Menu: ${booking.selectedMenuName} · Rs ${Number(quotation.menuPricePerPerson).toLocaleString("en-PK")}/guest`,
+      `Hall rent: Rs ${Number(quotation.hallRental).toLocaleString("en-PK")}`,
+      `Tax (${quotation.taxPercent}%): Rs ${Number(quotation.taxAmount).toLocaleString("en-PK")}`,
+      `Total: Rs ${Number(quotation.total).toLocaleString("en-PK")}`,
+      `20% advance: Rs ${Number(quotation.advanceRequired).toLocaleString("en-PK")}`,
+      "Yeh quote selected menu, hall aur tax ke liye hai; decor/optional add-ons shamil nahi.",
+      "Kya aap is quotation par agree karte hain? Haan kahenge to main verified payment details bhej dunga/dungi.",
+    ]
+    : language === "ur"
+      ? [
+        `ویڈنگ کوٹیشن - ${booking.answers.eventType || "شادی"}`,
+        `تاریخ: ${date}`,
+        `ہال: ${booking.hallName}`,
+        `مہمان: ${quotation.guests}`,
+        `مینو: ${booking.selectedMenuName} · ${Number(quotation.menuPricePerPerson).toLocaleString("en-PK")} روپے فی مہمان`,
+        `ہال کا کرایہ: ${Number(quotation.hallRental).toLocaleString("en-PK")} روپے`,
+        `ٹیکس (${quotation.taxPercent}%): ${Number(quotation.taxAmount).toLocaleString("en-PK")} روپے`,
+        `کل رقم: ${Number(quotation.total).toLocaleString("en-PK")} روپے`,
+        `20% ایڈوانس: ${Number(quotation.advanceRequired).toLocaleString("en-PK")} روپے`,
+        "اس کوٹیشن میں منتخب مینو، ہال اور ٹیکس شامل ہیں؛ ڈیکور اور اضافی سہولیات شامل نہیں۔",
+        "کیا آپ اس کوٹیشن سے متفق ہیں؟ ہاں کہیں تو میں تصدیق شدہ ادائیگی کی تفصیل بھیج دوں گا/گی۔",
+      ]
+      : [
+        `Wedding quotation - ${booking.answers.eventType || "Wedding"}`,
+        `Date: ${date}`,
+        `Hall: ${booking.hallName}`,
+        `Guests: ${quotation.guests}`,
+        `Menu: ${booking.selectedMenuName} · Rs ${Number(quotation.menuPricePerPerson).toLocaleString("en-PK")}/guest`,
+        `Hall rental: Rs ${Number(quotation.hallRental).toLocaleString("en-PK")}`,
+        `Tax (${quotation.taxPercent}%): Rs ${Number(quotation.taxAmount).toLocaleString("en-PK")}`,
+        `Total: Rs ${Number(quotation.total).toLocaleString("en-PK")}`,
+        `20% advance: Rs ${Number(quotation.advanceRequired).toLocaleString("en-PK")}`,
+        "This quote includes the selected menu, hall, and tax; decor and optional add-ons are not included.",
+        "Do you agree to this quotation? Reply yes and I will send the verified payment details.",
+      ];
+  return [...lines, ...quotation.rulesApplied.map((rule) => `• ${rule}`)].join("\n");
+}
+
+function weddingPaymentRequestMessage(booking, payment, language) {
+  const amount = `Rs ${Number(booking.quotation.advanceRequired).toLocaleString("en-PK")}`;
+  const details = [
+    `Bank: ${payment.bankName}`,
+    `Account title: ${payment.accountTitle}`,
+    payment.accountNumber ? `Account number: ${payment.accountNumber}` : "",
+    payment.iban ? `IBAN: ${payment.iban}` : "",
+  ].filter(Boolean);
+  if (language === "roman") {
+    return `Shukriya, aapka wedding quotation accept ho gaya. Booking abhi pending hai, confirm nahi hui. Meherbani karke 20% advance ${amount} jama karein:\\n${details.join("\n")}\\nPayment ke baad screenshot isi WhatsApp par bhej dein. CS team verify karke aapse rabta karegi; booking uske baad staff confirm karega.`;
+  }
+  if (language === "ur") {
+    return `شکریہ، آپ کا ویڈنگ کوٹیشن قبول ہو گیا ہے۔ بکنگ ابھی زیرِ التوا ہے، کنفرم نہیں ہوئی۔ براہِ کرم 20% ایڈوانس ${amount} جمع کروائیں:\\n${details.join("\n")}\\nادائیگی کے بعد اسی واٹس ایپ پر اسکرین شاٹ بھیجیں۔ CS ٹیم تصدیق کرکے آپ سے رابطہ کرے گی؛ اس کے بعد اسٹاف بکنگ کنفرم کرے گا۔`;
+  }
+  return `Thank you, your wedding quotation is accepted. The booking is pending, not confirmed. Please pay the 20% advance of ${amount}:\\n${details.join("\n")}\\nAfter payment, send the screenshot here on WhatsApp. Our CS team will verify it and contact you; staff will confirm the booking after verification.`;
+}
+
 exports.handleEnquiryMessage = async (req, res) => {
   try {
     if (!requireApiKey(req, res)) return;
@@ -332,12 +527,18 @@ exports.handleEnquiryMessage = async (req, res) => {
     const message = String(req.body.message || "").trim();
     if (!customerPhone || !message) return res.status(400).json({ success: false, message: "customerPhone and message are required." });
     const restaurantId = restaurantFor(req);
+    const detectedLanguage = customerLanguage(message);
     let booking = await WeddingBooking.findOne({
       restaurantId,
       customerPhone,
       bookingType: "wedding",
       stage: { $nin: ["confirmed", "executed", "feedback", "follow_up", "no_booking"] },
-      $or: [{ currentQuestionIndex: { $lt: QUESTIONS.length } }, { awaitingHallChoice: true }],
+      $or: [
+        { currentQuestionIndex: { $lt: QUESTIONS.length } },
+        { awaitingHallChoice: true },
+        { awaitingQuotationAgreement: true },
+        { awaitingAdvancePayment: true },
+      ],
     }).sort({ createdAt: -1 });
 
     if (!booking && req.body.isWeddingStart !== true) return res.json({ success: true, data: { active: false, replyText: "" } });
@@ -347,75 +548,179 @@ exports.handleEnquiryMessage = async (req, res) => {
         bookingType: "wedding",
         customerPhone,
         customerName: String(req.body.customerName || "").slice(0, 160),
+        customerLanguage: detectedLanguage,
         source: "whatsapp",
         stage: "inquiry",
         stageHistory: [{ stage: "inquiry", actorName: "WhatsApp AI", note: "Wedding enquiry started from WhatsApp." }],
       });
       void notifyNewWeddingEnquiry(req, booking);
-      const firstQuestion = QUESTIONS[booking.currentQuestionIndex].prompt;
+      const firstQuestion = localizedQuestion(booking.currentQuestionIndex, detectedLanguage);
       addAiReply(booking, 0, firstQuestion);
       await booking.save();
       return res.json({ success: true, data: { active: true, bookingId: booking._id, complete: false, questionIndex: 0, replyText: firstQuestion } });
     }
 
+    booking.customerLanguage = customerLanguage(message, booking.customerLanguage);
+
+    if (booking.awaitingQuotationAgreement) {
+      if (!acceptedQuotation(message)) {
+        booking.awaitingQuotationAgreement = false;
+        await changeStage(booking, "follow_up", null, "Customer did not accept the wedding quotation or requested staff assistance.");
+        const replyText = handoffReply(booking.customerLanguage);
+        addAiReply(booking, QUESTIONS.length + 3, replyText);
+        await booking.save();
+        return res.json({ success: true, data: { active: false, handoff: true, bookingId: booking._id, complete: true, replyText } });
+      }
+      const payment = weddingPaymentInstructions();
+      if (!payment.configured) {
+        booking.awaitingQuotationAgreement = false;
+        await changeStage(booking, "follow_up", null, "Customer accepted the quotation, but verified company payment instructions are not configured.");
+        const replyText = handoffReply(booking.customerLanguage);
+        addAiReply(booking, QUESTIONS.length + 3, replyText);
+        await booking.save();
+        return res.json({ success: true, data: { active: false, handoff: true, bookingId: booking._id, complete: true, replyText } });
+      }
+      booking.awaitingQuotationAgreement = false;
+      booking.awaitingAdvancePayment = true;
+      booking.paymentStatus = "unpaid";
+      await changeStage(booking, "advance_payment", null, "Customer accepted the automatic wedding quotation; verified payment instructions sent.");
+      const replyText = weddingPaymentRequestMessage(booking, payment, booking.customerLanguage);
+      addAiReply(booking, QUESTIONS.length + 3, replyText);
+      await booking.save();
+      void notifyCustomerAgreed(req, booking);
+      return res.json({ success: true, data: { active: true, bookingId: booking._id, complete: true, replyText } });
+    }
+
+    if (booking.awaitingAdvancePayment) {
+      if (paymentClaim(message)) {
+        const replyText = booking.customerLanguage === "roman"
+          ? "Payment ka screenshot ya receipt isi WhatsApp par bhej dein. CS team proof verify karke aapse rabta karegi; tab tak booking pending rahegi."
+          : booking.customerLanguage === "ur"
+            ? "ادائیگی کی رسید یا اسکرین شاٹ اسی واٹس ایپ پر بھیج دیں۔ CS ٹیم ثبوت کی تصدیق کرکے آپ سے رابطہ کرے گی؛ اس وقت تک بکنگ زیرِ التوا رہے گی۔"
+            : "Please send the payment screenshot or receipt here on WhatsApp. CS will verify the proof and contact you; the booking remains pending until then.";
+        addAiReply(booking, QUESTIONS.length + 4, replyText);
+        await booking.save();
+        return res.json({ success: true, data: { active: true, bookingId: booking._id, complete: true, replyText } });
+      }
+      booking.awaitingAdvancePayment = false;
+      await changeStage(booking, "follow_up", null, "Customer requested assistance instead of completing the advance payment.");
+      const replyText = handoffReply(booking.customerLanguage);
+      addAiReply(booking, QUESTIONS.length + 4, replyText);
+      await booking.save();
+      return res.json({ success: true, data: { active: false, handoff: true, bookingId: booking._id, complete: true, replyText } });
+    }
+
     if (booking.awaitingHallChoice) {
-      const decline = /\b(no|nope|decline|not interested|not available|no booking)\b/i.test(message);
-      if (decline && booking.alternateDates.length) {
+      const decline = /\b(no|nope|decline|not interested|no booking|too expensive|cannot pay|can't pay|cant pay)\b/i.test(message)
+        || /نہیں|مہنگا|ادائیگی نہیں/.test(message);
+      if (decline) {
         booking.awaitingHallChoice = false;
-        await changeStage(booking, "no_booking", null, "Customer declined the suggested wedding dates.");
-        const replyText = "Thank you for letting us know. Our team is here if you would like to enquire about another date.";
+        await changeStage(booking, "follow_up", null, "Customer declined the wedding options or requested staff assistance.");
+        const replyText = handoffReply(booking.customerLanguage);
         addAiReply(booking, QUESTIONS.length + 1, replyText);
         await booking.save();
-        void notifyCustomerDeclined(req, booking);
-        return res.json({ success: true, data: { active: false, bookingId: booking._id, complete: true, replyText } });
+        return res.json({ success: true, data: { active: false, handoff: true, bookingId: booking._id, complete: true, replyText } });
       }
-      const requestedDate = message.match(/\d{4}-\d{2}-\d{2}/)?.[0] || booking.answers.weddingDate;
+      const requestedDate = message.match(/\d{4}-\d{2}-\d{2}/)?.[0] || booking.acceptedAlternateDate || booking.answers.weddingDate;
       const isOriginalDate = requestedDate === booking.answers.weddingDate;
       const isSuggestedDate = booking.alternateDates.includes(requestedDate);
       if (!dayDate(requestedDate) || (!isOriginalDate && !isSuggestedDate)) {
         const options = [booking.answers.weddingDate, ...booking.alternateDates].filter(Boolean);
-        const replyText = `Please choose one of these dates and include the preferred hall name: ${options.join(", ")}.`;
+        const replyText = booking.customerLanguage === "roman"
+          ? `Meherbani karke in dates mein se ek date, hall aur wedding menu choose karein: ${options.join(", ")}.`
+          : booking.customerLanguage === "ur"
+            ? `براہِ کرم ان تاریخوں میں سے ایک تاریخ، ہال اور ویڈنگ مینو منتخب کریں: ${options.join("، ")}۔`
+            : `Please choose one of these dates, a hall, and a wedding menu: ${options.join(", ")}.`;
         addAiReply(booking, QUESTIONS.length + 1, replyText);
         await booking.save();
         return res.json({ success: true, data: { active: true, bookingId: booking._id, complete: true, replyText } });
       }
       const candidates = (await getDateRows(restaurantId, dayDate(requestedDate)))
         .filter((hall) => hall.status === "available" && hall.capacity >= Number(booking.answers.guests || 0));
-      const requestedHall = candidates.find((hall) => message.toLowerCase().includes(hall.hallName.toLowerCase()));
+      const savedHallId = String(booking.hallId || "");
+      const requestedHall = candidates.find((hall) => message.toLowerCase().includes(hall.hallName.toLowerCase()))
+        || candidates.find((hall) => String(hall.hallId) === savedHallId && requestedDate === (booking.acceptedAlternateDate || booking.answers.weddingDate));
       const hall = requestedHall || (candidates.length === 1 ? candidates[0] : null);
-      if (!hall) {
-        if (!candidates.length) {
-          const suggestions = await findSuggestions(restaurantId, dayDate(requestedDate), "", 3, Number(booking.answers.guests || 0));
-          booking.alternateDates = suggestions.map((item) => item.date);
-          booking.awaitingHallChoice = Boolean(suggestions.length);
-          const replyText = suggestions.length ? `That date is no longer available. Please choose another date: ${suggestions.map((item) => `${item.date} (${item.halls.map((itemHall) => itemHall.hallName).join(", ")})`).join("; ")}.` : "Those dates are no longer available. Our customer-care team will contact you with other options.";
+      if (!candidates.length) {
+        const suggestions = await findSuggestions(restaurantId, dayDate(requestedDate), "", 3, Number(booking.answers.guests || 0));
+        booking.alternateDates = suggestions.map((item) => item.date);
+        booking.hallId = null;
+        booking.hallName = "";
+        booking.acceptedAlternateDate = "";
+        booking.awaitingHallChoice = Boolean(suggestions.length);
+        const options = suggestions.map((item) => `${item.date} (${item.halls.map((venue) => venue.hallName).join(", ")})`).join("; ");
+        const replyText = suggestions.length
+          ? booking.customerLanguage === "roman"
+            ? `Maazrat, is date par suitable hall available nahi. Yeh alternate dates hain: ${options}. In mein se date aur hall choose karein.`
+            : booking.customerLanguage === "ur"
+              ? `معذرت، اس تاریخ پر مناسب ہال دستیاب نہیں۔ متبادل تاریخیں: ${options}۔ براہِ کرم تاریخ اور ہال منتخب کریں۔`
+              : `Sorry, no suitable hall is available on that date. Available alternatives: ${options}. Please choose a date and hall.`
+          : handoffReply(booking.customerLanguage);
+        addAiReply(booking, QUESTIONS.length + 1, replyText);
+        await booking.save();
+        return res.json({ success: true, data: { active: Boolean(suggestions.length), handoff: !suggestions.length, bookingId: booking._id, complete: true, replyText } });
+      }
+      const menu = await Menu.findOne({ restaurantId, category: "Wedding Package" }).lean();
+      const packages = (menu?.weddingPackages || []).filter((item) => item.isActive !== false);
+      const requestedPackage = packages.find((item) => String(item.name || "").trim() && message.toLowerCase().includes(String(item.name).toLowerCase()))
+        || packages.find((item) => String(item._id) === String(booking.menuPackageId || ""))
+        || (packages.length === 1 ? packages[0] : null);
+      if (!hall || !requestedPackage) {
+        if (hall) {
+          booking.hallId = hall.hallId;
+          booking.hallName = hall.hallName;
+          booking.acceptedAlternateDate = isOriginalDate ? "" : requestedDate;
+        }
+        if (!packages.length) {
+          booking.awaitingHallChoice = false;
+          await changeStage(booking, "follow_up", null, "No active wedding menu package is configured for an automatic quotation.");
+          const replyText = handoffReply(booking.customerLanguage);
           addAiReply(booking, QUESTIONS.length + 1, replyText);
           await booking.save();
-          return res.json({ success: true, data: { active: Boolean(suggestions.length), bookingId: booking._id, complete: true, replyText } });
+          return res.json({ success: true, data: { active: false, handoff: true, bookingId: booking._id, complete: true, replyText } });
         }
-        const replyText = `Please choose a hall for ${requestedDate}: ${candidates.map((item) => `${item.hallName} (capacity ${item.capacity})`).join(", ")}.`;
+        const missing = [
+          !hall ? `hall (${candidates.map((item) => item.hallName).join(", ")})` : "",
+          !requestedPackage ? `wedding menu (${packages.map((item) => `${item.name} · Rs ${Number(item.pricePerPerson).toLocaleString("en-PK")}/guest`).join(", ")})` : "",
+        ].filter(Boolean);
+        const replyText = booking.customerLanguage === "roman"
+          ? `Quote banane ke liye bas ${missing.join(" aur ")} choose kar dein.`
+          : booking.customerLanguage === "ur"
+            ? `کوٹیشن کے لیے براہِ کرم ${missing.join(" اور ")} منتخب کریں۔`
+            : `To prepare your quote, please choose ${missing.join(" and ")}.`;
         addAiReply(booking, QUESTIONS.length + 1, replyText);
         await booking.save();
         return res.json({ success: true, data: { active: true, bookingId: booking._id, complete: true, replyText } });
       }
+      const selectedHall = { ...hall, date: requestedDate };
       booking.acceptedAlternateDate = isOriginalDate ? "" : requestedDate;
-      booking.hallId = hall.hallId;
-      booking.hallName = hall.hallName;
-      booking.awaitingHallChoice = false;
       await changeStage(booking, "hall_check", null, `Customer selected ${hall.hallName} for ${requestedDate}; availability rechecked.`);
-      const replyText = `Thank you. ${hall.hallName} on ${requestedDate} is available for ${booking.answers.guests} guests. I have recorded your preference; our customer-care team will prepare the quotation and confirm the booking with you.`;
-      addAiReply(booking, QUESTIONS.length + 1, replyText);
+      const quoteError = await createCustomerWeddingQuotation(booking, restaurantId, selectedHall, requestedPackage);
+      if (quoteError) {
+        booking.awaitingQuotationAgreement = false;
+        await changeStage(booking, "follow_up", null, quoteError);
+        const replyText = handoffReply(booking.customerLanguage);
+        addAiReply(booking, QUESTIONS.length + 1, replyText);
+        await booking.save();
+        return res.json({ success: true, data: { active: false, handoff: true, bookingId: booking._id, complete: true, replyText } });
+      }
+      const replyText = weddingQuotationMessage(booking, booking.customerLanguage);
+      addAiReply(booking, QUESTIONS.length + 2, replyText);
       await booking.save();
-      void notifyCustomerAgreed(req, booking);
-      return res.json({ success: true, data: { active: false, bookingId: booking._id, complete: true, replyText } });
+      return res.json({ success: true, data: { active: true, bookingId: booking._id, complete: true, replyText, quotation: booking.quotation } });
     }
 
     const questionIndex = booking.currentQuestionIndex;
     const question = QUESTIONS[questionIndex];
+    const language = booking.customerLanguage;
     if (question.key === "guests") {
       const guests = Number(message.replace(/[^\d]/g, ""));
       if (!Number.isInteger(guests) || guests < 1) {
-        const validationReply = "Please tell me the number of guests as a positive whole number.";
+        const validationReply = language === "roman"
+          ? "Meherbani karke guests ki tadaad ek positive whole number mein batayein."
+          : language === "ur"
+            ? "براہِ کرم مہمانوں کی تعداد ایک مثبت مکمل عدد میں بتائیں۔"
+            : "Please tell me the number of guests as a positive whole number.";
         addAiReply(booking, questionIndex, validationReply);
         await booking.save();
         return res.json({ success: true, data: { active: true, bookingId: booking._id, complete: false, questionIndex, replyText: validationReply } });
@@ -424,7 +729,11 @@ exports.handleEnquiryMessage = async (req, res) => {
     } else if (question.key === "weddingDate") {
       const value = message.match(/\d{4}-\d{2}-\d{2}/)?.[0] || "";
       if (!dayDate(value)) {
-        const validationReply = "Please send the wedding date in YYYY-MM-DD format (for example, 2026-09-05).";
+        const validationReply = language === "roman"
+          ? "Meherbani karke wedding date YYYY-MM-DD format mein bhejein (misal: 2026-09-05)."
+          : language === "ur"
+            ? "براہِ کرم شادی کی تاریخ YYYY-MM-DD فارمیٹ میں بھیجیں (مثال: 2026-09-05)۔"
+            : "Please send the wedding date in YYYY-MM-DD format (for example, 2026-09-05).";
         addAiReply(booking, questionIndex, validationReply);
         await booking.save();
         return res.json({ success: true, data: { active: true, bookingId: booking._id, complete: false, questionIndex, replyText: validationReply } });
@@ -455,6 +764,16 @@ exports.handleEnquiryMessage = async (req, res) => {
       const packageOptions = (menu?.weddingPackages || []).filter((item) => item.isActive !== false)
         .map((item) => `${item.name} Rs ${item.pricePerPerson}/guest`)
         .join("; ");
+      if (!packageOptions || (!available.length && !alternatives.length)) {
+        booking.awaitingHallChoice = false;
+        await changeStage(booking, "follow_up", null, !packageOptions
+          ? "No active wedding menu package is configured."
+          : "No suitable hall or alternate date is currently available for the wedding enquiry.");
+        replyText = handoffReply(booking.customerLanguage);
+        addAiReply(booking, questionIndex + 1, replyText);
+        await booking.save();
+        return res.json({ success: true, data: { active: false, handoff: true, bookingId: booking._id, complete: true, replyText, answers: booking.answers } });
+      }
       const availabilityText = available.length
         ? `Available halls for ${booking.answers.weddingDate}: ${available.map((hall) => `${hall.hallName} (capacity ${hall.capacity})`).join(", ")}.`
         : `No matching hall is available for ${booking.answers.weddingDate}${alternatives.length ? `. Alternate dates: ${alternatives.map((item) => `${item.date} (${item.halls.map((hall) => hall.hallName).join(", ")})`).join("; ")}` : ""}.`;
@@ -464,14 +783,47 @@ exports.handleEnquiryMessage = async (req, res) => {
       ].filter(Boolean);
       const offerText = `Grandest Wedding Offer starts at Rs ${menu?.grandestOffer?.startingPrice ?? 1499} + tax${guestPerks.length ? `; eligible perks: ${guestPerks.join(", ")}` : ""}.`;
       const nextStep = available.length
-        ? "Reply with your preferred hall name."
+        ? booking.customerLanguage === "roman"
+          ? "Ab apna preferred hall aur wedding menu choose karke bhej dein."
+          : booking.customerLanguage === "ur"
+            ? "اب اپنا پسندیدہ ہال اور ویڈنگ مینو منتخب کرکے بھیج دیں۔"
+            : "Reply with your preferred hall and wedding menu."
         : alternatives.length
-          ? "Reply with your preferred alternate date and hall name."
-          : "Our customer-care team will contact you with other date options.";
-      replyText = `Thank you — I have saved your wedding details. ${availabilityText}${packageOptions ? ` Wedding menus: ${packageOptions}.` : ""} ${offerText} ${nextStep}`;
+          ? booking.customerLanguage === "roman"
+            ? "Meherbani karke alternate date, hall aur menu choose karein."
+            : booking.customerLanguage === "ur"
+              ? "براہِ کرم متبادل تاریخ، ہال اور مینو منتخب کریں۔"
+              : "Reply with your preferred alternate date, hall, and menu."
+          : handoffReply(booking.customerLanguage);
+      const translatedAvailability = booking.customerLanguage === "roman"
+        ? (available.length
+          ? `${booking.answers.weddingDate} ke liye available halls: ${available.map((hall) => `${hall.hallName} (capacity ${hall.capacity})`).join(", ")}.`
+          : `${booking.answers.weddingDate} par koi matching hall available nahi${alternatives.length ? `. Alternate dates: ${alternatives.map((item) => `${item.date} (${item.halls.map((hall) => hall.hallName).join(", ")})`).join("; ")}` : ""}.`)
+        : booking.customerLanguage === "ur"
+          ? (available.length
+            ? `${booking.answers.weddingDate} کے لیے دستیاب ہال: ${available.map((hall) => `${hall.hallName} (گنجائش ${hall.capacity})`).join("، ")}۔`
+            : `${booking.answers.weddingDate} پر کوئی موزوں ہال دستیاب نہیں${alternatives.length ? `۔ متبادل تاریخیں: ${alternatives.map((item) => `${item.date} (${item.halls.map((hall) => hall.hallName).join("، ")})`).join("؛ ")}` : ""}۔`)
+          : availabilityText;
+      const translatedPackages = packageOptions
+        ? booking.customerLanguage === "roman"
+          ? `Wedding menus: ${packageOptions}.`
+          : booking.customerLanguage === "ur"
+            ? `ویڈنگ مینو: ${packageOptions}۔`
+            : `Wedding menus: ${packageOptions}.`
+        : "";
+      const translatedOffer = booking.customerLanguage === "roman"
+        ? `Grandest Wedding Offer Rs ${menu?.grandestOffer?.startingPrice ?? 1499} + tax se shuru hota hai${guestPerks.length ? `; eligible perks: ${guestPerks.join(", ")}` : ""}.`
+        : booking.customerLanguage === "ur"
+          ? `گرینڈیسٹ ویڈنگ آفر ${menu?.grandestOffer?.startingPrice ?? 1499} روپے + ٹیکس سے شروع ہوتا ہے${guestPerks.length ? `؛ دستیاب سہولیات: ${guestPerks.join("، ")}` : ""}۔`
+          : offerText;
+      replyText = booking.customerLanguage === "roman"
+        ? `Shukriya, aapki wedding details save ho gayi hain. ${translatedAvailability} ${translatedPackages} ${translatedOffer} ${nextStep}`
+        : booking.customerLanguage === "ur"
+          ? `شکریہ، آپ کی شادی کی تفصیلات محفوظ ہوگئی ہیں۔ ${translatedAvailability} ${translatedPackages} ${translatedOffer} ${nextStep}`
+          : `Thank you — I have saved your wedding details. ${translatedAvailability} ${translatedPackages} ${translatedOffer} ${nextStep}`;
       addAiReply(booking, questionIndex + 1, replyText);
     } else {
-      replyText = QUESTIONS[booking.currentQuestionIndex].prompt;
+      replyText = localizedQuestion(booking.currentQuestionIndex, booking.customerLanguage);
       addAiReply(booking, booking.currentQuestionIndex, replyText);
     }
     await booking.save();
@@ -588,9 +940,20 @@ exports.updateStage = async (req, res) => {
     const booking = await WeddingBooking.findOne({ _id: req.params.id, restaurantId: req.admin.restaurantId, bookingType: "wedding" });
     if (!booking) return res.status(404).json({ success: false, message: "Wedding booking not found." });
     const previousStage = booking.stage;
-    const { stage, note, interested, followUpAt } = req.body;
+    let { stage, note, interested, followUpAt } = req.body;
     if (!WeddingBooking.stages.includes(stage)) return res.status(400).json({ success: false, message: "Invalid wedding stage." });
     if (stage === "confirmed") return res.status(409).json({ success: false, message: "Use the confirm endpoint so payment and hall inventory are verified." });
+    const rejectingPaymentProof = req.body.paymentProofRejection === true;
+    if (rejectingPaymentProof) {
+      note = String(note || "").trim();
+      if (!booking.paymentProofUrl || booking.paymentVerified) return res.status(409).json({ success: false, message: "An unverified payment proof is required before rejection." });
+      if (!note) return res.status(400).json({ success: false, message: "A reason is required to reject payment proof." });
+      booking.paymentStatus = "rejected";
+      booking.paymentProofRejectionReason = note.slice(0, 500);
+      booking.paymentProofConfirmedByCustomer = false;
+      stage = "no_booking";
+      note = `Payment proof rejected: ${note.slice(0, 450)}`;
+    }
     if (stage === "interested" && interested === false) {
       booking.interested = false;
       booking.followUpAt = followUpAt ? new Date(followUpAt) : null;
@@ -606,7 +969,7 @@ exports.updateStage = async (req, res) => {
       await changeStage(booking, stage, req.admin, note || "");
     }
     await booking.save();
-    if (booking.stage === "no_booking" && previousStage !== "no_booking") void notifyCustomerDeclined(req, booking);
+    if (booking.stage === "no_booking" && previousStage !== "no_booking" && !rejectingPaymentProof) void notifyCustomerDeclined(req, booking);
     res.json({ success: true, data: await populatedBooking(WeddingBooking.findById(booking._id)) });
   } catch (error) {
     console.error("updateWeddingStage error:", error);
@@ -692,6 +1055,7 @@ exports.verifyPayment = async (req, res) => {
     const booking = await WeddingBooking.findOne({ _id: req.params.id, restaurantId: req.admin.restaurantId, bookingType: "wedding" });
     if (!booking) return res.status(404).json({ success: false, message: "Wedding booking not found." });
     if (!booking.paymentProofUrl) return res.status(409).json({ success: false, message: "Add the customer's advance payment proof before verification." });
+    if (booking.paymentProofConfirmedByCustomer === false) return res.status(409).json({ success: false, message: "Wait for the customer to confirm the submitted payment proof before verification." });
     booking.paymentVerified = true;
     booking.paymentStatus = "verified";
     booking.paymentVerifiedAt = new Date();
@@ -746,6 +1110,40 @@ async function releaseHall(booking) {
 
 function weddingConfirmationText(booking) {
   const date = booking.acceptedAlternateDate || booking.answers.weddingDate;
+  const time = [booking.answers.startTime, booking.answers.endTime].filter(Boolean).join(" - ") || "As agreed";
+  const guests = booking.quotation.guests || booking.answers.guests || "As agreed";
+  const menu = booking.selectedMenuName || booking.packageName || "As agreed";
+  const advance = `Rs ${Number(booking.quotation.advanceRequired || 0).toLocaleString("en-PK")}`;
+  if (booking.customerLanguage === "roman") {
+    return [
+      `Dear ${booking.customerName || "Customer"},`,
+      "",
+      "Aapki Hotel d'GATES wedding booking confirm ho gayi hai.",
+      `Event: ${booking.answers.eventType || "Wedding"}`,
+      `Hall: ${booking.hallName}`,
+      `Date: ${date}`,
+      `Time: ${time}`,
+      `Guests: ${guests}`,
+      `Menu: ${menu}`,
+      `Verified advance: ${advance}`,
+      "Shukriya, hamari team final event arrangements ke liye aapse rabta karegi.",
+    ].join("\n");
+  }
+  if (booking.customerLanguage === "ur") {
+    return [
+      `محترم/محترمہ ${booking.customerName || "گاہک"}،`,
+      "",
+      "Hotel d'GATES میں آپ کی شادی کی بکنگ کنفرم ہوگئی ہے۔",
+      `تقریب: ${booking.answers.eventType || "شادی"}`,
+      `ہال: ${booking.hallName}`,
+      `تاریخ: ${date}`,
+      `وقت: ${time}`,
+      `مہمان: ${guests}`,
+      `مینو: ${menu}`,
+      `تصدیق شدہ ایڈوانس: ${advance}`,
+      "شکریہ، تقریب کی حتمی تیاریوں کے لیے ہماری ٹیم آپ سے رابطہ کرے گی۔",
+    ].join("\n");
+  }
   return [
     `Dear ${booking.customerName || "Customer"},`,
     "",
@@ -753,10 +1151,10 @@ function weddingConfirmationText(booking) {
     `Event: ${booking.answers.eventType || "Wedding"}`,
     `Hall: ${booking.hallName}`,
     `Date: ${date}`,
-    `Time: ${[booking.answers.startTime, booking.answers.endTime].filter(Boolean).join(" – ") || "As agreed"}`,
-    `Guests: ${booking.quotation.guests || booking.answers.guests || "As agreed"}`,
-    `Menu: ${booking.selectedMenuName || booking.packageName || "As agreed"}`,
-    `Advance verified: Rs ${Number(booking.quotation.advanceRequired || 0).toLocaleString("en-PK")}`,
+    `Time: ${time}`,
+    `Guests: ${guests}`,
+    `Menu: ${menu}`,
+    `Advance verified: ${advance}`,
     "",
     "Thank you for choosing Hotel d'GATES. We look forward to celebrating with you.",
   ].join("\n");
